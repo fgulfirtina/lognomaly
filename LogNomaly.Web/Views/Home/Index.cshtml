@@ -1,0 +1,210 @@
+@model LogNomaly.Web.Models.DashboardViewModel
+@{ ViewData["Title"] = "Dashboard"; }
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Dashboard</h1>
+        <p class="page-subtitle">System Overview &amp; Threat Monitoring</p>
+    </div>
+    <div class="live-badge"><div class="live-dot"></div> Live Monitoring</div>
+</div>
+
+@if (!Model.HasData)
+{
+    <div class="card">
+        <div class="empty-state">
+            <div class="empty-icon">◈</div>
+            <p style="color:var(--text-muted);font-size:14px">No Analysis yet.</p>
+            <p style="color:var(--text-dim);font-size:12px;margin-top:6px">Upload a file from the Log Analysis Page.</p>
+            <a href="/Home/Analyze" class="btn btn-primary" style="margin-top:20px">Analyse logs</a>
+        </div>
+    </div>
+}
+else
+{
+    var stats = Model.Stats!;
+    var normalCount  = stats.TotalLogs - stats.TotalAnomalies;
+    var normalPct    = stats.TotalLogs > 0 ? normalCount * 100.0 / stats.TotalLogs : 95;
+    var anomalyPct   = stats.TotalLogs > 0 ? stats.TotalAnomalies * 100.0 / stats.TotalLogs : 5;
+    var riskPct      = (int)(stats.AvgRiskScore * 100);
+
+    <!-- KPI Grid -->
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-label">
+                Total Processed Logs
+                <div class="kpi-icon" style="background:#f5f5f0">≡</div>
+            </div>
+            <div class="kpi-value">@stats.TotalLogs.ToString("N0")</div>
+            <div class="kpi-sub">Processed Log Lines</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">
+                Detected Anomalies
+                <div class="kpi-icon" style="background:#fff0f0">⚠</div>
+            </div>
+            <div class="kpi-value danger">@stats.TotalAnomalies.ToString("N0")</div>
+            <div class="kpi-sub danger">@(stats.TotalAnomalies > 0 ? "Requires Attention" : "All Clear")</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">
+                Average Risk Score
+                <div class="kpi-icon" style="background:#f5f5f0">▣</div>
+            </div>
+            <div class="kpi-value">@stats.AvgRiskScore.ToString("F2")</div>
+            <div class="kpi-progress"><div class="kpi-progress-fill" style="width:@riskPct%"></div></div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">
+                System Status
+                <div class="kpi-icon" style="background:#f0faf4">✓</div>
+            </div>
+            <div class="active-badge"><div class="active-dot"></div> Active</div>
+        </div>
+    </div>
+
+    <div class="two-col">
+        <!-- Risk Distribution -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">Risk Distribution</div>
+                <span style="color:#ccc;font-size:16px;letter-spacing:2px">···</span>
+            </div>
+            <div class="donut-wrap">
+                <canvas id="donutChart" width="120" height="120"></canvas>
+                <div style="flex:1">
+                    @{ var low = stats.RiskDistribution.GetValueOrDefault("Low", 0); }
+                    @{ var mid = stats.RiskDistribution.GetValueOrDefault("Medium", 0); }
+                    @{ var high = stats.RiskDistribution.GetValueOrDefault("High", 0); }
+                    @foreach (var kv in new[] {
+                        ("Normal",     normalCount, "#d0d0c8"),
+                        ("Suspicious", mid,         "#c8f000"),
+                        ("Critical",   high,        "#e24b4a"),
+                    })
+                    {
+                        var pct2 = stats.TotalLogs > 0 ? kv.Item2 * 100.0 / stats.TotalLogs : 0;
+                        <div class="legend-item">
+                            <div class="legend-left">
+                                <div class="legend-dot" style="background:@kv.Item3"></div>
+                                @kv.Item1
+                            </div>
+                            <div class="legend-pct">@pct2.ToString("F0")%</div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Tehdit Türleri -->
+        <div class="card">
+            <div class="card-header">
+                <div>
+                    <div class="card-title">Anomalies Over Time</div>
+                    <div class="card-subtitle">Threat type distribution</div>
+                </div>
+                <div class="time-tabs">
+                    <button class="tab active">All</button>
+                </div>
+            </div>
+            @if (stats.ThreatTypes.Any())
+            {
+                @foreach (var kv in stats.ThreatTypes.OrderByDescending(x => x.Value).Take(5))
+                {
+                    var pct3 = stats.TotalLogs > 0 ? kv.Value * 100.0 / stats.TotalLogs : 0;
+                    <div style="margin-bottom:14px">
+                        <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+                            <span style="font-size:13px;color:var(--text-muted)">@kv.Key</span>
+                            <span style="font-size:13px;font-weight:500;color:var(--text-primary)">@kv.Value</span>
+                        </div>
+                        <div style="height:5px;background:var(--bg-page);border-radius:3px;overflow:hidden">
+                            <div style="height:100%;width:@pct3.ToString("F1")%;background:var(--text-primary);border-radius:3px"></div>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div style="text-align:center;padding:24px;color:var(--text-dim);font-size:13px">Tehdit tespit edilmedi.</div>
+            }
+        </div>
+    </div>
+
+    <!-- Recent Log Entries -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Recent Log Entries</div>
+            <a href="/Home/Analyze?sessionId=@Model.SessionId" class="btn btn-outline btn-sm">See All →</a>
+        </div>
+        @if (Model.RecentResults.Any())
+        {
+            <table class="log-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Risk</th>
+                        <th>Score</th>
+                        <th>Class</th>
+                        <th>Message</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @{ int idx = 0; }
+                    @foreach (var r in Model.RecentResults)
+                    {
+                        <tr onclick="location.href='/Home/Xai?sessionId=@Model.SessionId&index=@idx'">
+                            <td style="color:var(--text-dim);font-size:12px">@(idx+1)</td>
+                            <td><span class="risk-badge @r.RiskLevel">@r.RiskLevel</span></td>
+                            <td>
+                                <div class="score-bar-wrap">
+                                    <div class="score-bar">
+                                        <div class="score-bar-fill @r.RiskLevel" style="width:@((r.FinalRiskScore*100).ToString("F0"))%"></div>
+                                    </div>
+                                    <span class="score-num">@r.FinalRiskScore.ToString("F2")</span>
+                                </div>
+                            </td>
+                            <td style="font-size:12px;color:var(--text-muted)">@r.PredictedClass</td>
+                            <td class="msg-cell">@r.Message</td>
+                        </tr>
+                        idx++;
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+}
+
+@section Scripts {
+<script>
+(function() {
+    var stats = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Stats?.RiskDistribution ?? new Dictionary<string,int>()));
+    var canvas = document.getElementById('donutChart');
+    if (!canvas || !stats) return;
+    var ctx = canvas.getContext('2d');
+    var total = @(Model.Stats?.TotalLogs ?? 1);
+    var normal = @(Model.Stats != null ? Model.Stats.TotalLogs - Model.Stats.TotalAnomalies : 0);
+    var mid  = stats['Medium'] || 0;
+    var high = stats['High']   || 0;
+    var segments = [
+        { val: normal, color: '#d0d0c8' },
+        { val: mid,    color: '#c8f000' },
+        { val: high,   color: '#e24b4a' },
+    ];
+    var cx=60, cy=60, r=46, inner=30, start=-Math.PI/2;
+    segments.forEach(function(s) {
+        if (!s.val) return;
+        var slice = (s.val / total) * Math.PI * 2;
+        ctx.beginPath(); ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, r, start, start+slice);
+        ctx.closePath(); ctx.fillStyle = s.color; ctx.fill();
+        start += slice;
+    });
+    ctx.beginPath(); ctx.arc(cx,cy,inner,0,Math.PI*2);
+    ctx.fillStyle='#fff'; ctx.fill();
+    var pct = total > 0 ? Math.round(normal*100/total) : 95;
+    ctx.fillStyle='#111'; ctx.font='500 16px Inter,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(pct+'%', cx, cy-6);
+    ctx.fillStyle='#aaa'; ctx.font='400 9px Inter,sans-serif';
+    ctx.fillText('NORMAL', cx, cy+9);
+})();
+</script>
+}

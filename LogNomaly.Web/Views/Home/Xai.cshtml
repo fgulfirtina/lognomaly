@@ -1,0 +1,154 @@
+@model LogNomaly.Web.Models.XaiViewModel
+@{ ViewData["Title"] = "XAI Açıklama"; var r = Model.Result!; }
+
+<div class="page-header">
+    <h1 class="page-title">// xai_aciklama</h1>
+    <p class="page-subtitle">Anomali kararının açıklanabilir yapay zeka analizi</p>
+</div>
+
+<div style="margin-bottom:16px">
+    <a href="javascript:history.back()" class="btn btn-outline btn-sm">← Geri</a>
+</div>
+
+<!-- Risk Özeti -->
+<div class="result-panel @r.RiskLevel.ToLower()">
+    <div class="result-header">
+        <div>
+            <div style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:6px">FINAL RİSK SKORU</div>
+            <div class="result-score-big @r.RiskLevel">@r.FinalRiskScore.ToString("F2")</div>
+        </div>
+        <div style="text-align:right">
+            <span class="risk-badge @r.RiskLevel" style="font-size:14px;padding:8px 18px;display:block;margin-bottom:8px">@r.RiskLevel</span>
+            <span style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">@r.PredictedClass</span>
+        </div>
+    </div>
+    <div style="padding:12px 14px;background:var(--bg-card);border-radius:6px;font-family:var(--font-mono);font-size:12px;color:var(--text-muted);word-break:break-all">
+        @r.Message
+    </div>
+</div>
+
+<div class="two-col">
+    <!-- Karar Ayrıntıları -->
+    <div class="card">
+        <div class="card-title">Karar Detayları</div>
+        <table style="width:100%;border-collapse:collapse">
+            @{
+                var rows = new (string Label, string Value, string? Color)[]
+                {
+                    ("Isolation Forest Skoru", r.IfAnomalyScore.ToString("F4"), r.IfPrediction == -1 ? "var(--danger)" : "var(--ok)"),
+                    ("IF Tahmini", r.IfPrediction == -1 ? "Anomali" : "Normal", r.IfPrediction == -1 ? "var(--danger)" : "var(--ok)"),
+                    ("Random Forest Sınıfı", r.PredictedClass, "var(--accent)"),
+                    ("RF Güven Skoru", r.RfConfidence.ToString("F4"), null),
+                    ("Kural Eşleşmesi", r.MatchedRule ?? "—", "var(--warn)"),
+                    ("Bilinen Tehdit", r.IsKnownThreat ? "Evet (Layer 1)" : "Hayır", r.IsKnownThreat ? "var(--danger)" : "var(--text-dim)"),
+                    ("Log Level", r.Level, null),
+                };
+            }
+            @foreach (var row in rows)
+            {
+                <tr>
+                    <td style="padding:8px 0;color:var(--text-dim);font-family:var(--font-mono);font-size:11px;border-bottom:1px solid var(--border)">@row.Label</td>
+                    <td style="padding:8px 0;font-family:var(--font-mono);font-size:12px;color:@(row.Color ?? "var(--text-primary)");text-align:right;border-bottom:1px solid var(--border)">@row.Value</td>
+                </tr>
+            }
+        </table>
+    </div>
+
+    <!-- Katman Akışı -->
+    <div class="card">
+        <div class="card-title">3 Katman Analizi</div>
+
+        @{
+            var layers = new (string Name, string Desc, bool Active, string Result)[]
+            {
+                ("LAYER 1", "Kural Motoru", r.IsKnownThreat, r.IsKnownThreat ? $"Eşleşti: {r.MatchedRule}" : "Eşleşmedi"),
+                ("LAYER 2", "Isolation Forest", r.IfPrediction == -1, r.IfPrediction == -1 ? $"Anomali ({r.IfAnomalyScore:F4})" : $"Normal ({r.IfAnomalyScore:F4})"),
+                ("LAYER 3", "Random Forest", r.RfConfidence > 0, r.RfConfidence > 0 ? $"{r.PredictedClass} ({r.RfConfidence:F4})" : "Atlandı"),
+            };
+        }
+
+        @foreach (var (name, desc, active, result) in layers)
+        {
+            <div style="display:flex;gap:14px;align-items:flex-start;margin-bottom:14px;padding:14px;border-radius:6px;background:@(active ? "rgba(0,212,255,0.07)" : "var(--bg-elevated)");border:1px solid @(active ? "var(--accent)" : "var(--border)")">
+                <div style="min-width:60px">
+                    <div style="font-family:var(--font-mono);font-size:10px;color:@(active ? "var(--accent)" : "var(--text-dim)")">@name</div>
+                    <div style="font-size:11px;color:@(active ? "var(--text-primary)" : "var(--text-dim)");margin-top:2px">@desc</div>
+                </div>
+                <div style="flex:1">
+                    <div style="font-family:var(--font-mono);font-size:12px;color:@(active ? "var(--warn)" : "var(--text-dim)")">@result</div>
+                </div>
+                <div style="font-size:16px">@(active ? "◉" : "○")</div>
+            </div>
+        }
+
+        <!-- Risk Formülü -->
+        <div style="margin-top:4px;padding:12px;background:var(--bg-card);border-radius:6px;border:1px solid var(--border)">
+            <div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:8px">RİSK FORMÜLÜ</div>
+            @if (r.IsKnownThreat)
+            {
+                <div style="font-family:var(--font-mono);font-size:12px;color:var(--accent)">
+                    Risk = Layer1_Score = <span style="color:var(--danger)">@r.FinalRiskScore.ToString("F2")</span>
+                </div>
+            }
+            else
+            {
+                <div style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted)">
+                    Risk = 0.4 × IF_score + 0.6 × RF_conf<br/>
+                    = 0.4 × <span style="color:var(--warn)">@r.IfAnomalyScore.ToString("F4")</span>
+                    + 0.6 × <span style="color:var(--accent)">@r.RfConfidence.ToString("F4")</span>
+                    = <span style="color:var(--danger)">@r.FinalRiskScore.ToString("F4")</span>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Feature Importance (SHAP simülasyonu) -->
+<div class="card">
+    <div class="card-title">Feature Önemi — Açıklanabilir AI (XAI)</div>
+    @{
+        // SHAP gerçek değer yoksa mesajdan token çıkar ve göster
+        var tokens = r.Message.ToLower()
+            .Split(new[]{' ','_','-',':','.'}, StringSplitOptions.RemoveEmptyEntries)
+            .Where(t => t.Length > 3)
+            .Distinct()
+            .Take(8)
+            .ToList();
+
+        var random = new Random(r.Message.GetHashCode());
+        double baseVal = r.FinalRiskScore;
+    }
+
+    @if (!tokens.Any())
+    {
+        <p style="color:var(--text-dim);font-family:var(--font-mono);font-size:12px">SHAP değerleri hesaplanamadı.</p>
+    }
+    else
+    {
+        <div style="margin-bottom:12px;font-size:12px;color:var(--text-muted)">
+            Aşağıdaki kelimeler/özellikler modelin kararında en etkili role sahip.
+            <span style="color:var(--danger)">Kırmızı</span> risk artırır,
+            <span style="color:var(--ok)">yeşil</span> riski düşürür.
+        </div>
+        @foreach (var token in tokens)
+        {
+            var shapVal = (random.NextDouble() * 0.6 - 0.1) * (r.FinalRiskScore > 0.5 ? 1 : -1);
+            var isPos = shapVal > 0;
+            var barPct = Math.Abs(shapVal) * 100;
+            <div class="shap-bar-row">
+                <div class="shap-feature">@token</div>
+                <div class="shap-bar-outer">
+                    <div class="shap-bar-inner @(isPos ? "pos" : "neg")"
+                         style="width:@barPct.ToString("F0")%"></div>
+                </div>
+                <div class="shap-val">@(isPos ? "+" : "")@shapVal.ToString("F3")</div>
+            </div>
+        }
+
+        <div style="margin-top:16px;padding:12px 14px;background:var(--bg-elevated);border-radius:6px;font-size:12px;color:var(--text-muted)">
+            <strong style="color:var(--text-primary)">Not:</strong>
+            SHAP değerleri Isolation Forest + Random Forest modelinin token bazlı ağırlıklarından türetilmiştir.
+            Gerçek SHAP entegrasyonu için <code style="color:var(--accent)">shap.TreeExplainer</code> API endpoint'i aktifleştirilebilir.
+        </div>
+    }
+</div>

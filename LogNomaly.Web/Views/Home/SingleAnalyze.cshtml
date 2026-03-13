@@ -1,0 +1,58 @@
+﻿@model LogNomaly.Web.Models.SingleAnalyzeViewModel
+@{ ViewData["Title"] = "Tek Satir Analiz"; }
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Single Line Analysis</h1>
+        <p class="page-subtitle">Analyze a single log line</p>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert-error">@Model.ErrorMessage</div>
+}
+
+<div class="card">
+    <div class="card-header"><div class="card-title">Enter Log Line</div></div>
+    <form method="post">
+        <textarea name="logLine" class="log-input" placeholder="2005-06-03 R02-M1-N0 RAS KERNEL INFO instruction cache parity error corrected" rows="3">@Model.LogLine</textarea>
+        <div style="display:flex;gap:10px">
+            <button type="submit" class="btn btn-primary">Analyze</button>
+            @if (Model.Result != null) { <a href="/Home/SingleAnalyze" class="btn btn-outline">Clear</a> }
+        </div>
+    </form>
+</div>
+
+@if (Model.Result != null)
+{
+    var r = Model.Result;
+    <div class="result-panel @r.RiskLevel.ToLower()">
+        <div class="result-header">
+            <div>
+                <div style="font-size:11px;color:var(--text-dim);margin-bottom:6px">RISK SCORE</div>
+                <div class="result-score-big @r.RiskLevel">@r.FinalRiskScore.ToString("F2")</div>
+            </div>
+            <span class="risk-badge @r.RiskLevel" style="font-size:14px;padding:8px 18px">@r.RiskLevel</span>
+        </div>
+        <div class="result-meta">
+            <div class="meta-item"><div class="meta-label">Class</div><div class="meta-value">@r.PredictedClass</div></div>
+            <div class="meta-item"><div class="meta-label">Threat</div><div class="meta-value">@(r.ThreatType ?? "-")</div></div>
+            <div class="meta-item"><div class="meta-label">IF Score</div><div class="meta-value">@r.IfAnomalyScore.ToString("F4")</div></div>
+            <div class="meta-item"><div class="meta-label">RF Trust</div><div class="meta-value">@r.RfConfidence.ToString("F4")</div></div>
+            <div class="meta-item"><div class="meta-label">Rule</div><div class="meta-value">@(r.MatchedRule ?? "-")</div></div>
+            <div class="meta-item"><div class="meta-label">Known Threat</div><div class="meta-value">@(r.IsKnownThreat ? "Evet" : "Hayir")</div></div>
+        </div>
+        <div style="margin-top:16px;padding:12px;background:var(--bg-page);border-radius:8px;font-size:12px;color:var(--text-muted)">@r.Message</div>
+    </div>
+}
+else if (string.IsNullOrEmpty(Model.LogLine))
+{
+    <div style="margin-top:8px">
+        <div style="font-size:11px;color:var(--text-dim);margin-bottom:10px">LOG EXAMPLES</div>
+        @foreach (var ex in new[]{"machine check: uncorrectable error in memory","instruction cache parity error corrected","Failed login attempt for user root from 192.168.1.5","rts: kernel: fatal error in blade R05-M0"})
+        {
+            <div onclick="document.querySelector('textarea').value='@ex'" style="padding:10px 14px;background:var(--bg-page);border:0.5px solid var(--border);border-radius:8px;margin-bottom:8px;cursor:pointer;font-size:12px;color:var(--text-muted)">@ex</div>
+        }
+    </div>
+}

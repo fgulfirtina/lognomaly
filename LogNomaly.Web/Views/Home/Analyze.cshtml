@@ -1,0 +1,105 @@
+﻿@model LogNomaly.Web.Models.AnalyzeViewModel
+@{ ViewData["Title"] = "Log Analysis"; }
+
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+    <div class="loading-text">Analiz ediliyor...</div>
+</div>
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Log Analysis</h1>
+        <p class="page-subtitle">Load a Log File and Detect Anomalies</p>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert-error">@Model.ErrorMessage</div>
+}
+
+@if (!Model.Results.Any())
+{
+    <div class="card">
+        <div class="card-header"><div class="card-title">Upload File</div></div>
+        <form method="post" enctype="multipart/form-data" id="uploadForm">
+            <div class="upload-zone" id="uploadZone">
+                <input type="file" name="logFile" id="fileInput" accept=".log,.txt,.csv" />
+                <div class="upload-icon">^</div>
+                <div class="upload-text" id="uploadLabel">Drag or Select the Log File</div>
+                <div class="upload-hint">.log  .txt  .csv  max 50 MB</div>
+            </div>
+            <button type="submit" class="btn btn-primary" id="submitBtn" disabled>Analyse</button>
+        </form>
+    </div>
+}
+else
+{
+    var stats = Model.Stats!;
+    var anomalyPct = stats.TotalLogs > 0 ? (stats.TotalAnomalies * 100.0 / stats.TotalLogs) : 0;
+    <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-label">Total Logs</div><div class="kpi-value">@stats.TotalLogs.ToString("N0")</div></div>
+        <div class="kpi-card"><div class="kpi-label">Anomalıes</div><div class="kpi-value danger">@stats.TotalAnomalies.ToString("N0")</div><div class="kpi-sub danger">@anomalyPct.ToString("F1")%</div></div>
+        <div class="kpi-card"><div class="kpi-label">Avg Risk</div><div class="kpi-value">@stats.AvgRiskScore.ToString("F2")</div></div>
+        <div class="kpi-card"><div class="kpi-label">Normal</div><div class="kpi-value">@((stats.TotalLogs - stats.TotalAnomalies).ToString("N0"))</div></div>
+    </div>
+    <div class="filter-bar">
+        <span>Filtre:</span>
+        <button class="filter-btn active" onclick="filterTable('')">Tumü (@Model.Results.Count)</button>
+        <button class="filter-btn" onclick="filterTable('High')">High (@Model.Results.Count(r => r.RiskLevel == "High"))</button>
+        <button class="filter-btn" onclick="filterTable('Medium')">Medium (@Model.Results.Count(r => r.RiskLevel == "Medium"))</button>
+        <button class="filter-btn" onclick="filterTable('Low')">Low (@Model.Results.Count(r => r.RiskLevel == "Low"))</button>
+        <a href="/Home/Analyze" class="btn btn-outline btn-sm" style="margin-left:auto">New Analysis</a>
+    </div>
+    <div class="card">
+        <table class="log-table" id="resultsTable">
+            <thead><tr><th>#</th><th>Risk</th><th>Score</th><th>Class</th><th>Rule</th><th>Message</th></tr></thead>
+            <tbody>
+                @{ int i = 0; }
+                @foreach (var r in Model.Results)
+                {
+                    <tr data-risk="@r.RiskLevel" onclick="location.href='/Home/Xai?sessionId=@Model.SessionId&index=@i'">
+                        <td style="color:var(--text-dim);font-size:12px">@(i+1)</td>
+                        <td><span class="risk-badge @r.RiskLevel">@r.RiskLevel</span></td>
+                        <td>
+                            <div class="score-bar-wrap">
+                                <div class="score-bar"><div class="score-bar-fill @r.RiskLevel" style="width:@((r.FinalRiskScore*100).ToString("F0"))%"></div></div>
+                                <span class="score-num">@r.FinalRiskScore.ToString("F2")</span>
+                            </div>
+                        </td>
+                        <td style="font-size:12px;color:var(--text-muted)">@r.PredictedClass</td>
+                        <td style="font-size:11px;color:var(--text-dim)">@(r.MatchedRule ?? "-")</td>
+                        <td class="msg-cell">@r.Message</td>
+                    </tr>
+                    i++;
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@section Scripts {
+<script>
+var zone = document.getElementById('uploadZone');
+var input = document.getElementById('fileInput');
+var label = document.getElementById('uploadLabel');
+var submit = document.getElementById('submitBtn');
+var form = document.getElementById('uploadForm');
+if (zone) {
+    zone.addEventListener('click', function() { input.click(); });
+    zone.addEventListener('dragover', function(e) { e.preventDefault(); zone.classList.add('dragover'); });
+    zone.addEventListener('dragleave', function() { zone.classList.remove('dragover'); });
+    zone.addEventListener('drop', function(e) { e.preventDefault(); zone.classList.remove('dragover'); if(e.dataTransfer.files[0]){ input.files=e.dataTransfer.files; updateLabel(e.dataTransfer.files[0].name); }});
+    input.addEventListener('change', function() { if(input.files[0]) updateLabel(input.files[0].name); });
+    form.addEventListener('submit', function() { document.getElementById('loadingOverlay').classList.add('show'); });
+}
+function updateLabel(name) { label.textContent = name; submit.disabled = false; }
+function filterTable(level) {
+    document.querySelectorAll('.filter-btn').forEach(function(b){b.classList.remove('active');});
+    event.target.classList.add('active');
+    document.querySelectorAll('#resultsTable tbody tr').forEach(function(row){
+        row.style.display = (!level || row.dataset.risk === level) ? '' : 'none';
+    });
+}
+</script>
+}

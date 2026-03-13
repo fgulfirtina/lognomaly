@@ -1,0 +1,45 @@
+version: "3.9"
+
+services:
+  # ── Python Backend ──────────────────────────────────────────────────
+  python-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lognomaly-api
+    ports:
+      - "5000:5000"
+    volumes:
+      - log_storage:/app/temp_uploads
+      - model_storage:/app/saved_models
+    environment:
+      - FLASK_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── ASP.NET Core Frontend ──────────────────────────────────────────
+  # (Frontend reposu hazır olduğunda aşağıdaki bloğu aktifleştir)
+  # dotnet-frontend:
+  #   build:
+  #     context: ../LogNomaly.Web
+  #     dockerfile: Dockerfile
+  #   container_name: lognomaly-web
+  #   ports:
+  #     - "80:8080"
+  #     - "443:8443"
+  #   environment:
+  #     - PythonApiUrl=http://python-api:5000
+  #   depends_on:
+  #     python-api:
+  #       condition: service_healthy
+  #   volumes:
+  #     - log_storage:/app/shared_logs
+  #   restart: unless-stopped
+
+volumes:
+  log_storage:    # Frontend + Backend arasında paylaşılan log alanı (NFR-09)
+  model_storage:  # Eğitilmiş ML model dosyaları
