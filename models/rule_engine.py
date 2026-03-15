@@ -1,14 +1,8 @@
-"""
-LogNomaly - Rule Engine
-FR-04: Layer 1 — Kural tabanlı hızlı filtreleme
-"""
-
 import re
 import logging
 from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
-
 
 @dataclass
 class Rule:
@@ -16,7 +10,7 @@ class Rule:
     pattern: re.Pattern
     threat_type: str
     description: str
-
+    score: float  # YENİ EKLENDİ: app.py'nin risk hesaplaması için gerekli
 
 # ======================================================================
 #  Varsayılan kural seti (genişletilebilir)
@@ -31,6 +25,7 @@ DEFAULT_RULES: list[Rule] = [
         ),
         threat_type="BruteForce",
         description="Tekrarlanan başarısız kimlik doğrulama girişimi",
+        score=1.0  # YENİ EKLENDİ
     ),
     Rule(
         name="SQLInjection",
@@ -41,16 +36,18 @@ DEFAULT_RULES: list[Rule] = [
         ),
         threat_type="SQLi",
         description="SQL injection veya script enjeksiyonu",
+        score=1.0  # YENİ EKLENDİ
     ),
     Rule(
         name="SystemFailure",
         pattern=re.compile(
             r'(kernel panic|out of memory|oom killer|segmentation fault|'
-            r'stack overflow|fatal error|system crash|disk full)',
+            r'stack overflow|fatal error|system crash|disk full|machine check|uncorrectable)',
             re.IGNORECASE
         ),
         threat_type="SystemFailure",
         description="Kritik sistem hatası",
+        score=0.95  # YENİ EKLENDİ
     ),
     Rule(
         name="PrivilegeEscalation",
@@ -61,6 +58,7 @@ DEFAULT_RULES: list[Rule] = [
         ),
         threat_type="PrivilegeEscalation",
         description="Yetki yükseltme girişimi",
+        score=1.0  # YENİ EKLENDİ
     ),
     Rule(
         name="PortScan",
@@ -70,6 +68,7 @@ DEFAULT_RULES: list[Rule] = [
         ),
         threat_type="PortScan",
         description="Port tarama aktivitesi",
+        score=0.85  # YENİ EKLENDİ
     ),
     Rule(
         name="MalwareIndicator",
@@ -80,35 +79,19 @@ DEFAULT_RULES: list[Rule] = [
         ),
         threat_type="Malware",
         description="Zararlı yazılım belirtisi",
+        score=1.0  # YENİ EKLENDİ
     ),
 ]
-
 
 # ======================================================================
 #  Rule Engine
 # ======================================================================
 class RuleEngine:
-    """
-    FR-04: Yapılandırılmış log mesajlarını önceden tanımlı
-    tehdit imzalarıyla karşılaştırır.
-    """
-
     def __init__(self, rules: list[Rule] | None = None):
         self.rules: list[Rule] = rules if rules is not None else DEFAULT_RULES
         logger.info("RuleEngine başlatıldı: %d kural yüklendi", len(self.rules))
 
     def check(self, message: str) -> dict:
-        """
-        Tek bir log mesajını tüm kurallarla kontrol eder.
-
-        Returns:
-            {
-              "is_known_threat": bool,
-              "threat_type": str | None,
-              "matched_rule": str | None,
-              "description": str | None,
-            }
-        """
         for rule in self.rules:
             if rule.pattern.search(message):
                 logger.debug("Kural eşleşti: %s — '%s'", rule.name, message[:60])
@@ -117,15 +100,16 @@ class RuleEngine:
                     "threat_type": rule.threat_type,
                     "matched_rule": rule.name,
                     "description": rule.description,
+                    "score": rule.score, # YENİ EKLENDİ
                 }
         return {
             "is_known_threat": False,
             "threat_type": None,
             "matched_rule": None,
             "description": None,
+            "score": None, # YENİ EKLENDİ
         }
 
     def add_rule(self, rule: Rule):
-        """Çalışma zamanında yeni kural ekle."""
         self.rules.append(rule)
         logger.info("Yeni kural eklendi: %s", rule.name)
