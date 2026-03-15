@@ -1,54 +1,77 @@
+<p align="center">
+
 # LogNomaly
 
-AI-Powered Log Anomaly Detection with Explainable AI
+### Explainable AI System for Log Anomaly Detection
 
-![Python](https://img.shields.io/badge/python-3.10-blue)
-![Machine Learning](https://img.shields.io/badge/Machine%20Learning-ScikitLearn-orange)
-![ASP.NET](https://img.shields.io/badge/Backend-ASP.NET%20Core-purple)
-![License](https://img.shields.io/badge/license-MIT-green)
+AI-powered platform for detecting and explaining anomalies in large-scale system logs.
 
-LogNomaly is an explainable AI system for detecting anomalies in large-scale system logs.
-It combines machine learning models, rule-based reasoning, and a web dashboard to help analysts detect and understand abnormal system behavior.
+</p>
+
+<p align="center">
+
+![Python](https://img.shields.io/badge/Python-3.10-blue)
+![Machine Learning](https://img.shields.io/badge/ScikitLearn-ML-orange)
+![ASP.NET](https://img.shields.io/badge/Web-ASP.NET%20Core-purple)
+![License](https://img.shields.io/badge/License-MIT-green)
+
+</p>
 
 ---
 
-## System Architecture
+## Overview
+
+LogNomaly is a hybrid anomaly detection platform that analyzes system logs using machine learning and explainable AI techniques.
+
+The system parses raw logs, extracts features, detects anomalies using multiple models, and explains predictions through an interactive web dashboard.
+
+---
+
+## Architecture
+
+<p align="center">
 
 ![architecture](docs/architecture.png)
 
-LogNomaly follows a hybrid anomaly detection pipeline:
+</p>
 
-Raw Logs → Log Parsing → Feature Extraction → Hybrid Detection → Explainable AI → Web Dashboard
+Pipeline:
 
-The machine learning pipeline is implemented in Python while the user interface is built using ASP.NET Core MVC.
+```
+Raw Logs
+   ↓
+Log Parsing
+   ↓
+Feature Extraction
+   ↓
+Hybrid Detection Engine
+   ↓
+Explainable AI
+   ↓
+Web Dashboard
+```
 
 ---
 
 ## Features
 
-• Hybrid anomaly detection (Isolation Forest + Random Forest + Rule Engine)
-• Explainable AI for interpretable predictions
-• Automated log feature extraction pipeline
-• Web dashboard for interactive log analysis
-• Scalable architecture for large log datasets
+* Hybrid anomaly detection (Isolation Forest + Random Forest + Rule Engine)
+* Explainable AI for anomaly interpretation
+* Automated log feature extraction
+* Interactive web-based dashboard
+* Modular ML pipeline
 
 ---
 
 ## Tech Stack
 
-Machine Learning
-Python
-Scikit-learn
-
-Backend
-Flask API
-
-Web Interface
-ASP.NET Core MVC
-
-Infrastructure
-Docker
-Docker Compose
+| Layer          | Technology           |
+| -------------- | -------------------- |
+| ML Pipeline    | Python, Scikit-learn |
+| API            | Flask                |
+| Web Interface  | ASP.NET Core MVC     |
+| Visualization  | HTML, CSS, JS        |
+| Infrastructure | Docker               |
 
 ---
 
@@ -57,12 +80,12 @@ Docker Compose
 ```
 LogNomaly
 │
-├── app/                # Python anomaly detection API
-├── models/             # ML models and rule engine
-├── utils/              # log parsing and feature extraction
-├── training/           # model training scripts
+├── app/                # Python API
+├── models/             # ML models
+├── utils/              # log processing
+├── training/           # training scripts
 ├── tests/              # unit tests
-├── LogNomaly.Web/      # ASP.NET web interface
+├── LogNomaly.Web/      # ASP.NET dashboard
 └── docs/               # architecture diagrams
 ```
 
@@ -70,19 +93,13 @@ LogNomaly
 
 ## Dataset
 
-LogNomaly was evaluated using the **Blue Gene/L (BGL) log dataset**, a widely used benchmark for log anomaly detection.
+This project uses the **Blue Gene/L (BGL) log dataset**, a widely used benchmark for log anomaly detection research.
 
-Dataset statistics
-
-• 4.7M log entries
-• 348K anomalies (~7.3%)
-• ~7 months of system activity
-
-Download dataset:
+Download dataset from Kaggle:
 
 https://www.kaggle.com/datasets/omduggineni/loghub-bgl-log-data
 
-Place the dataset in:
+Place it inside:
 
 ```
 data/BGL.log
@@ -107,7 +124,7 @@ pip install -r requirements.txt
 
 ---
 
-## Run the AI API
+## Run the API
 
 ```
 python app/app.py
@@ -130,19 +147,10 @@ http://localhost:5000
 
 ---
 
-## Future Work
-
-• real-time log stream analysis
-• deep learning anomaly detection
-• SIEM integration
-• advanced XAI visualization
-
----
-
 ## Author
 
 Doğa Ece Koca
-Computer Engineering – Dokuz Eylül University
+Computer Engineering — Dokuz Eylül University
 
 ---
 
