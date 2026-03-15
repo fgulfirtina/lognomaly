@@ -16,6 +16,9 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
+    
+from models.rule_engine import RuleEngine
+
 try:
     from models.xai_explainer import XAIExplainer
 except ImportError:
@@ -76,7 +79,8 @@ class ModelBundle:
         logger.info("Modeller yuklendi. Feature: %d", self.iso.n_features_in_)
 
     def vectorize(self, level: str, message: str) -> np.ndarray:
-        safe = level if level in self.le.classes_ else "INFO"
+    # Eski: safe = level if level in self.le.classes_ else "INFO"
+        safe = level if level in self.le.classes_ else "UNKNOWN" # DÜZELTİLDİ
         lenc = self.le.transform([safe]).reshape(1, 1)
         td   = np.zeros((1, 1))
         tv   = self.tfidf.transform([message])
@@ -88,27 +92,17 @@ try:
 except Exception as e:
     logger.error(f"Model yükleme hatası: {e}")
 
-# ======================================================================
-#  Kural Motoru (Layer 1)
-# ======================================================================
-RULES = [
-    (re.compile(r"failed.*(login|password|auth)|authentication failure|too many attempt", re.I), "BruteForce", 1.0),
-    (re.compile(r"union\s+select|drop\s+table|'--|or\s+1=1", re.I), "SQLi", 1.0),
-    (re.compile(r"machine check|uncorrectable|kernel panic|fatal error|segmentation fault|out of memory", re.I), "SystemFailure", 0.95),
-    (re.compile(r"exception|error|failed to|unreachable|timeout", re.I), "AppError", None),
-]
-
-def check_rules(message):
-    for pattern, threat, score in RULES:
-        if pattern.search(message):
-            return threat, score
-    return None, None
+# Kural motorunu başlat
+rule_engine = RuleEngine()
 
 # ======================================================================
 #  Pipeline
 # ======================================================================
 def run_pipeline(level: str, message: str) -> dict:
-    threat_type, rule_score = check_rules(message)
+    # Eski check_rules yerine yeni nesneyi kullanıyoruz
+    rule_result = rule_engine.check(message)
+    threat_type = rule_result["threat_type"]
+    rule_score = rule_result["score"]
 
     # Katman 1: Kural Eşleşmesi (Kritik Skor)
     if rule_score and rule_score >= 0.8:
