@@ -66,6 +66,7 @@ obj/
 
 LogNomaly.Web/bin/
 LogNomaly.Web/obj/
+LogNomaly.Web/appsettings.json
 
 ########################################
 # JetBrains IDE
@@ -96,3 +97,4 @@ docker-compose.override.yml
 
 data/*.log
 data/*.csv
+

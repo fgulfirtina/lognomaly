@@ -1,5 +1,5 @@
-using LogNomaly.Web.Models;
-using LogNomaly.Web.Services;
+using LogNomaly.Web.Entities.Models;
+using LogNomaly.Web.Services.Contracts;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LogNomaly.Web.Controllers;
