@@ -1,0 +1,196 @@
+﻿@model LogNomaly.Web.ViewModels.CaseReportViewModel
+@{
+    ViewData["Title"] = "Case Review";
+    var fb = Model.FeedbackRecord;
+    var ai = Model.AiInsight;
+}
+
+<div style="margin-bottom: 24px;">
+    <a href="/SocManager/Index" style="text-decoration:none; color:var(--text-muted); font-size:13px;">
+        ← Back to SOC Queue
+    </a>
+</div>
+
+<div class="page-header" style="margin-bottom: 24px;">
+    <div>
+        <h1 class="page-title" style="margin:0;">Incident Review: #@fb.LogId</h1>
+        <div class="page-subtitle">Reported by @fb.Analyst?.Username on @fb.CreatedAt.ToString("MMM dd, yyyy HH:mm")</div>
+    </div>
+
+    <div style="display:flex; gap:10px;">
+        @if (fb.Status == "Resolved" || fb.Status == "Closed")
+        {
+            <span class="risk-badge" style="background:var(--ok); color:white; padding:8px 16px; font-size:13px;">
+                🔒 This Incident is Officially Closed
+            </span>
+        }
+        else if (fb.ActionType == "FalsePositive")
+        {
+            <button class="btn" style="background:var(--ok); color:white; border:none;" onclick="processFeedback(@fb.Id, 'Approve')">✓ Approve Claim</button>
+            <button class="btn" style="background:var(--danger); color:white; border:none;" onclick="processFeedback(@fb.Id, 'Reject')">⊘ Reject</button>
+        }
+        else if (fb.ActionType == "Investigate")
+        {
+            <button class="btn btn-outline" style="color:var(--text-primary); border-color:var(--border);" onclick="addCaseNotes(@fb.Id)">📝 Add Case Notes</button>
+            <button class="btn" style="background:var(--warn); color:white; border:none;" onclick="closeInvestigation(@fb.Id)">🔒 Close Case (Resolved)</button>
+        }
+    </div>
+</div>
+
+<div class="two-col">
+    @if (fb.ActionType == "FalsePositive")
+    {
+        <div class="card" style="border-left: 4px solid var(--accent-dark);">
+            <div class="card-header"><div class="card-title">False Positive Claim</div></div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
+                <span style="font-size:14px;">Action Requested: <strong>Retrain Model</strong></span>
+                <span class="risk-badge High" style="background:var(--bg-page); border:1px solid var(--border); color:var(--text-muted);">Awaiting Approval</span>
+            </div>
+            <p style="font-size:13px; color:var(--text-muted); margin-bottom:16px;">
+                An analyst claims the AI prediction of <span style="color:var(--danger); font-weight:bold;">@fb.PredictedClass</span> is incorrect.
+            </p>
+            <div style="background: #fdfdf5; border: 1px dashed var(--accent-dark); padding: 12px 16px; border-radius: var(--radius-sm);">
+                <div style="font-size:10px; text-transform:uppercase; color:var(--text-muted); font-weight:600; margin-bottom:4px;">Analyst Justification</div>
+                <div style="font-size:13px; color:var(--text-primary); font-style:italic;">
+                    "@(string.IsNullOrEmpty(fb.AnalystNotes) ? "No notes provided." : fb.AnalystNotes)"
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="card" style="border-left: 4px solid var(--warn);">
+            <div class="card-header"><div class="card-title">Active Investigation</div></div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
+                <span style="font-size:14px;">Case Status: <strong style="color:var(--warn);">In Progress</strong></span>
+                <span class="risk-badge High">Immediate Action Required</span>
+            </div>
+            <p style="font-size:13px; color:var(--text-muted); margin-bottom:16px;">
+                This log is currently under deep investigation for potential security breaches based on the <span style="font-weight:bold;">@fb.PredictedClass</span> alert.
+            </p>
+            <div style="background: #fafafa; border: 1px solid var(--border); padding: 12px 16px; border-radius: var(--radius-sm);">
+                <div style="font-size:10px; text-transform:uppercase; color:var(--text-muted); font-weight:600; margin-bottom:4px;">Initial Incident Notes</div>
+                <div style="font-size:13px; color:var(--text-primary);">
+                    "@(string.IsNullOrEmpty(fb.AnalystNotes) ? "Investigation started without initial notes." : fb.AnalystNotes)"
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="card" style="border-left: 4px solid var(--warn);">
+        <div class="card-header"><div class="card-title">AI Engine Analysis</div></div>
+        <div style="font-size:14px; margin-bottom:12px;">
+            Original Prediction: <span class="risk-badge @ai.RiskLevel">@ai.PredictedClass</span>
+        </div>
+        <p style="font-size:13px; color:var(--text-muted);">
+            Risk Score: <strong>@(ai.FinalRiskScore * 100)%</strong>.
+            Review the SHAP features below to understand why the model flagged this.
+        </p>
+    </div>
+</div>
+
+<div class="card" style="background:#1a1a1a; padding:0; overflow:hidden;">
+    <div style="padding:10px 20px; background:#252525; color:#aaa; font-size:10px; font-family:var(--font-mono); text-transform:uppercase;">Raw Payload</div>
+    <div style="padding:24px; font-family:var(--font-mono); font-size:13px; color:#4ade80; line-height:1.6; white-space:pre-wrap;">@fb.RawLog</div>
+</div>
+
+<div class="card" style="margin-top:20px;">
+    <div class="card-header"><div class="card-title">Why did AI flag this? (SHAP Explainer)</div></div>
+
+    @if (ai.ShapExplanation != null && ai.ShapExplanation.TopFeatures != null)
+    {
+        @foreach (var feat in ai.ShapExplanation.TopFeatures)
+        {
+            var isPos = feat.ShapValue > 0;
+            var barPct = Math.Min(Math.Abs(feat.ShapValue) * 400, 100);
+            <div class="shap-bar-row" style="margin-bottom:18px;">
+                <div class="shap-feature" style="width:140px; font-size:12px; font-weight:500;">@feat.Feature</div>
+                <div class="shap-bar-outer" style="background:#f1f5f9; height:16px; flex:1;">
+                    <div style="width:@barPct.ToString("F0")%; height:100%; background:@(isPos ? "#ef4444" : "#3b82f6"); border-radius:4px;"></div>
+                </div>
+                <div style="font-size:11px; color:var(--text-muted); width:60px; text-align:right;">@feat.ShapValue.ToString("F3")</div>
+            </div>
+        }
+    }
+    else
+    {
+        <p style="font-size:13px; color:var(--text-dim);">No SHAP explanation available for this event.</p>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        // Sayfanın üstündeki butonları çalıştıracak kod (Index sayfasındakiyle aynı mantık)
+        async function processFeedback(feedbackId, actionType) {
+            if (!confirm(`Are you sure you want to ${actionType.toUpperCase()} this case?`)) return;
+
+            const endpoint = actionType === 'Approve' ? '/SocManager/ApproveFalsePositive' : '/SocManager/RejectFalsePositive';
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(feedbackId)
+                });
+                const data = await response.json();
+                if (data.success) {
+                    alert("✅ " + data.message);
+                    window.location.href = '/SocManager/Index'; // İşlem bitince listeye geri dön
+                } else {
+                    alert("❌ Action failed: " + data.message);
+                }
+            } catch (error) {
+                alert("Server error.");
+            }
+        }
+
+        async function closeInvestigation(feedbackId) {
+            const resolutionNote = prompt("Enter the final resolution notes or summary to close this case:");
+
+            if (resolutionNote === null) return;
+            if (resolutionNote.trim() === "") {
+                alert("You must provide a resolution summary to close an active case.");
+                return;
+            }
+
+            try {
+                const response = await fetch('/SocManager/CloseInvestigation', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ FeedbackId: feedbackId, Notes: resolutionNote })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    alert("🔒 Case officially closed and logged.");
+                    window.location.href = '/SocManager/Index';
+                } else {
+                    alert("Error: " + data.message);
+                }
+            } catch (error) {
+                alert("Server connection failed.");
+            }
+        }
+
+        async function addCaseNotes(feedbackId) {
+            const additionalNote = prompt("Enter additional investigation notes:");
+            if (!additionalNote || additionalNote.trim() === "") return;
+
+            try {
+                const response = await fetch('/SocManager/AddNotes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ FeedbackId: feedbackId, Notes: additionalNote })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    window.location.reload(); // Sayfayı yenile ki yeni notlar ekranda görünsün!
+                } else {
+                    alert("Error adding notes: " + data.message);
+                }
+            } catch (error) {
+                alert("Server connection failed.");
+            }
+        }
+    </script>
+}

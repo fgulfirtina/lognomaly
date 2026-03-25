@@ -30,8 +30,9 @@
 
 @if (Model.Result != null)
 {
-    var r = Model.Result;
+    var r = Model.Result!;
     var score = (r.FinalRiskScore * 100).ToString("F0");
+    var shortId = Model.SessionId?.Substring(0, Math.Min(Model.SessionId.Length, 8)) ?? "Unknown";
 
     <div class="result-panel @r.RiskLevel.ToLower()" style="margin-top:24px; padding:32px;">
         <div class="result-header" style="margin-bottom:24px;">
@@ -39,20 +40,31 @@
                 <div class="meta-label">Detection Score</div>
                 <div class="result-score-big @r.RiskLevel">@score/100</div>
             </div>
-            <span class="risk-badge @r.RiskLevel" style="font-size:14px; padding:8px 18px;">@r.RiskLevel.ToUpper() THREAT</span>
             <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
                 <span class="risk-badge @r.RiskLevel" style="font-size:14px; padding:8px 18px;">@r.RiskLevel.ToUpper() THREAT</span>
-
                 <span style="font-size:11px; color:var(--text-muted); border:1px solid #444; padding:4px 10px; border-radius:12px; background:var(--bg-page);">
                     🤖 Routed by: <strong style="color:var(--text-primary);">@(r.DatasetRouted ?? "BGL")</strong>
                 </span>
             </div>
         </div>
 
-        <div class="card" style="background:#1a1a1a; border:none; padding:0; overflow:hidden; margin-bottom:24px;">
-            <div style="padding:8px 16px; background:#252525; font-family:var(--font-mono); font-size:10px; color:#aaa;">RAW LOG PAYLOAD</div>
-            <div style="padding:20px; font-family:var(--font-mono); font-size:13px; color:#4ade80;">
-                <pre style="margin:0; white-space:pre-wrap;">@r.Message</pre>
+        <div class="card" style="background:#1a1a1a; border:none; padding:0; overflow:hidden;">
+            <div style="padding:10px 20px; background:#252525; display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <span style="font-family:var(--font-mono); font-size:10px; color:#aaa; text-transform:uppercase;">Raw Log Payload</span>
+                    @if (r.ExtractedHour != -1)
+                    {
+                        <span style="font-size:10px; background:rgba(59, 130, 246, 0.2); color:#60a5fa; border: 1px solid #3b82f6; padding:2px 8px; border-radius:12px;">
+                            🕒 Time Context: @(r.ExtractedHour.ToString("00")):00
+                        </span>
+                    }
+                </div>
+                <span id="copyBtn" onclick="copyLog()" style="color:var(--accent); font-size:11px; cursor:pointer; user-select:none;">
+                    <span id="copyIcon">❐</span> <span id="copyText">Copy</span>
+                </span>
+            </div>
+            <div style="padding:24px; font-family:var(--font-mono); font-size:13px; color:#4ade80; line-height:1.6;">
+                <pre id="rawLog" style="margin:0; white-space: pre-wrap;">@(string.IsNullOrEmpty(r.RawLog) ? r.Message : r.RawLog)</pre>
             </div>
         </div>
 
@@ -91,26 +103,11 @@
                             <div class="meta-item" style="display:flex; align-items:center; gap:10px; background:var(--bg-page); border:none; border-left:3px solid #f97316;">
                                 <span style="color:#f97316">🕒</span> Verify if this action was authorized outside business hours
                             </div>
-                            <div class="meta-item" style="display:flex; align-items:center; gap:10px; background:var(--bg-page); border:none;">
-                                <span style="color:#f97316">👤</span> Check user access logs for compromised credentials
-                            </div>
-                        }
-                        else if (r.PredictedClass == "SystemFailure" || r.DatasetRouted == "HDFS")
-                        {
-                            <div class="meta-item" style="display:flex; align-items:center; gap:10px; background:var(--bg-page); border:none; padding:10px; border-radius:6px;">
-                                <span style="color:#eab308">🔧</span> Run HDFS fsck (File System Check)
-                            </div>
-                            <div class="meta-item" style="display:flex; align-items:center; gap:10px; background:var(--bg-page); border:none; padding:10px; border-radius:6px;">
-                                <span style="color:#eab308">💾</span> Inspect DataNode health & memory usage
-                            </div>
                         }
                         else if (r.IsKnownThreat || r.PredictedClass != "Normal")
                         {
                             <div class="meta-item" style="display:flex; align-items:center; gap:10px; background:var(--bg-page); border:none; border-left:3px solid var(--danger); padding:10px; border-radius:6px;">
                                 <span style="color:var(--danger)">⊘</span> Block associated IP Address immediately
-                            </div>
-                            <div class="meta-item" style="display:flex; align-items:center; gap:10px; background:var(--bg-page); border:none; padding:10px; border-radius:6px;">
-                                <span style="color:var(--danger)">🛡️</span> Isolate affected endpoints
                             </div>
                         }
                         else
@@ -126,7 +123,8 @@
             <div class="card">
                 <div class="card-title">Why is this Risky? (SHAP)</div>
                 <div style="margin-top:15px;">
-                    @if (r.ShapExplanation != null && r.ShapExplanation.TopFeatures.Any())
+                    @* +++ BURADAKİ NULL HATASI DÜZELTİLDİ +++ *@
+                    @if (r.ShapExplanation != null && r.ShapExplanation.TopFeatures != null && r.ShapExplanation.TopFeatures.Any())
                     {
                         @foreach (var feat in r.ShapExplanation.TopFeatures)
                         {
@@ -150,9 +148,94 @@
             </div>
         </div>
 
-        <div style="margin-top:24px; display:flex; gap:12px; justify-content:center;">
-            <button class="btn btn-outline" style="border-radius:20px;">Flag as False Positive</button>
-            <button class="btn btn-primary" style="border-radius:20px; padding:10px 30px;">🔍 Start Investigation</button>
+        <div class="card" style="margin-top:24px; display:flex; justify-content:center; align-items:center; gap:16px; background:var(--bg-page);">
+            <button class="btn btn-outline" onclick="flagFalsePositive()" style="border-radius:20px; background:white;">Flag as False Positive</button>
+            <button class="btn btn-primary" onclick="startInvestigation()" style="border-radius:20px; padding:10px 30px;">🔍 Start Investigation</button>
         </div>
     </div>
+}
+
+@section Scripts {
+    <script>
+        function copyLog() {
+            const logText = document.getElementById('rawLog').innerText;
+            const btnText = document.getElementById('copyText');
+            const btnIcon = document.getElementById('copyIcon');
+
+            navigator.clipboard.writeText(logText).then(() => {
+                btnText.innerText = "Copied!";
+                btnIcon.innerText = "✓";
+                setTimeout(() => {
+                    btnText.innerText = "Copy";
+                    btnIcon.innerText = "❐";
+                }, 2000);
+            });
+        }
+
+        async function sendActionToBackend(actionType, notes = "") {
+            var shortId = Model.SessionId?.Substring(0, Math.Min(Model.SessionId.Length, 8)) ?? "Unknown";
+            const logId = shortId;
+            const rawLog = document.getElementById('rawLog') ? document.getElementById('rawLog').innerText.trim() : "Log bulunamadı";
+            const predictedClass = "@(Model.Result?.PredictedClass ?? "Unknown")";
+            const riskLevel = "@(Model.Result?.RiskLevel ?? "Low")";
+
+            const payload = {
+                LogId: logId,
+                RawLog: rawLog,
+                PredictedClass: predictedClass,
+                RiskLevel: riskLevel,
+                ActionType: actionType,
+                AnalystNotes: notes
+            };
+
+            try {
+                const response = await fetch('/Feedback/Submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    if (actionType === 'Investigate') {
+                        alert("✅ Vaka başarıyla oluşturuldu! Log, Analist paneline atandı.");
+                    } else {
+                        alert("✅ Log 'False Positive' olarak işaretlendi. Model eğitimi için karantinaya alındı!");
+                    }
+                } else {
+                    alert("❌ İşlem başarısız: " + data.message);
+                }
+            } catch (error) {
+                console.error("API Bağlantı Hatası:", error);
+                alert("Sunucuya ulaşılamadı. Lütfen konsolu kontrol edin.");
+            }
+        }
+
+        function startInvestigation() {
+            const notes = prompt("Vaka (Investigation) başlatılıyor. Varsa ön notlarınızı girebilirsiniz (Opsiyonel):");
+            if (notes !== null) {
+                sendActionToBackend("Investigate", notes);
+            }
+            if(confirm("Bu log için resmi bir inceleme (vaka) başlatmak istediğinize emin misiniz?")) {
+                sendActionToBackend("Investigate");
+            }
+        }
+
+        function flagFalsePositive() {
+            const reason = prompt("Lütfen bu olayın neden 'False Positive' (Yanlış Alarm) olduğunu açıklayın (Zorunlu):");
+
+            if (reason === null) {
+                return; // Kullanıcı Cancel/İptal tuşuna bastı
+            }
+
+            if (reason.trim() === "") {
+                alert("❌ İşlem reddedildi: False Positive bildirimi için geçerli bir gerekçe yazmak zorundasınız.");
+                return;
+            }
+
+            if(confirm("Bu log'u için False Positive olarak işaretlemek istediğinize emin misiniz?")) {
+                sendActionToBackend("FalsePositive", reason);
+            }
+    </script>
 }

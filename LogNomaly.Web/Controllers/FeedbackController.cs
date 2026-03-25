@@ -1,7 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using LogNomaly.Web.Entities.DTOs;
+﻿using LogNomaly.Web.Entities.DTOs;
 using LogNomaly.Web.Services.Contracts;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace LogNomaly.Web.Controllers
 {
@@ -28,10 +29,15 @@ namespace LogNomaly.Web.Controllers
 
             try
             {
-                // Şimdilik Login sistemimiz olmadığı için 1 numaralı kullanıcıyı varsayıyoruz.
-                int temporaryAnalystId = 1;
+                var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
-                bool isSuccess = await _feedbackService.SubmitFeedbackAsync(request, temporaryAnalystId);
+                if (!int.TryParse(userIdClaim, out int actualAnalystId))
+                {
+                    _logger.LogWarning("Failed to extract Analyst ID from user claims.");
+                    return Unauthorized(new { success = false, message = "Session invalid or expired." });
+                }
+
+                bool isSuccess = await _feedbackService.SubmitFeedbackAsync(request, actualAnalystId);
 
                 if (isSuccess)
                 {

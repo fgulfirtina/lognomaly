@@ -166,8 +166,8 @@
 			});
 		}
 
-		
-		async function sendActionToBackend(actionType) {
+
+		async function sendActionToBackend(actionType, notes = "") {
 			const logId = "@shortId";
 			const rawLog = document.getElementById('rawLog') ? document.getElementById('rawLog').innerText.trim() : "Log bulunamadı";
 			const predictedClass = "@(Model.Result?.PredictedClass ?? "Unknown")";
@@ -178,7 +178,8 @@
 				RawLog: rawLog,
 				PredictedClass: predictedClass,
 				RiskLevel: riskLevel,
-				ActionType: actionType
+				ActionType: actionType,
+				AnalystNotes: notes
 			};
 
 			try {
@@ -206,15 +207,25 @@
 		}
 
 		function startInvestigation() {
-			if(confirm("Bu log için resmi bir inceleme (vaka) başlatmak istediğinize emin misiniz?")) {
-				sendActionToBackend("Investigate");
-			}
+			const notes = prompt("Vaka (Investigation) başlatılıyor. Varsa ön notlarınızı girebilirsiniz (Opsiyonel):");
+
+			if (notes === null) return; // Kullanıcı iptale bastı, işlemi kes
+
+			// Not girsin veya boş bıraksın fark etmez, tek bir istek atıyoruz
+			sendActionToBackend("Investigate", notes);
 		}
 
 		function flagFalsePositive() {
-			if(confirm("Bu logu 'False Positive' (Yanlış Alarm) olarak işaretlemek istiyor musunuz?")) {
-				sendActionToBackend("FalsePositive");
+			const reason = prompt("Lütfen bu olayın neden 'False Positive' (Yanlış Alarm) olduğunu açıklayın (Zorunlu):");
+
+			if (reason === null) return; // Kullanıcı iptale bastı
+
+			if (reason.trim() === "") {
+				alert("❌ İşlem reddedildi: False Positive bildirimi için geçerli bir gerekçe yazmak zorundasınız.");
+				return;
 			}
+
+			sendActionToBackend("FalsePositive", reason);
 		}
 	</script>
 }

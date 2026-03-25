@@ -30,7 +30,8 @@ namespace LogNomaly.Web.Services
                     ActionType = request.ActionType,
                     Status = "Pending", // Karantinada, onay bekliyor
                     CreatedAt = DateTime.UtcNow,
-                    AnalystId = analystId
+                    AnalystId = analystId,
+                    AnalystNotes = request.AnalystNotes
                 };
 
                 _context.AnalystFeedbacks.Add(feedback);
@@ -45,7 +46,8 @@ namespace LogNomaly.Web.Services
                         AssignedAnalystId = analystId, // Butona basan analistin üzerine atıyoruz
                         Status = "Open",
                         OpenedAt = DateTime.UtcNow,
-                        AnalystNotes = "Auto-generated case from SOC Dashboard."
+                        AnalystNotes = "Auto-generated case from SOC Dashboard.",
+                        ResolutionNotes = "No resolution notes are found."
                     };
 
                     _context.InvestigationCases.Add(newCase);

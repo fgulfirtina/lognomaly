@@ -61,7 +61,7 @@
                                 </td>
                                 <td style="font-size:12px; color:var(--text-muted);">@invCase.OpenedAt.ToString("MMM dd, HH:mm")</td>
                                 <td>
-                                    <button class="btn btn-outline btn-sm">Review</button>
+                                    <a href="/SocManager/Review/@invCase.FeedbackId" class="btn btn-outline btn-sm">Review Case</a>
                                 </td>
                             </tr>
                         }
@@ -107,14 +107,21 @@
                         @foreach (var fp in Model.PendingFalsePositives)
                         {
                             <tr>
-                                <td style="font-family:var(--font-mono); font-weight:500;">@fp.LogId</td>
+                                <td style="font-family:var(--font-mono); font-weight:500;">
+                                    <a href="/SocManager/Review/@fp.Id" 
+                                       style="color:var(--accent-dark); font-weight:500; text-decoration:none; border-bottom:1px dashed var(--accent-dark); transition:opacity 0.2s;" 
+                                       onmouseover="this.style.opacity='0.7'" 
+                                       onmouseout="this.style.opacity='1'">
+                                        @fp.LogId
+                                    </a>
+                                </td>
                                 <td><span style="color:var(--danger); font-size:12px;">@fp.PredictedClass</span> → <span style="color:var(--ok); font-size:12px; font-weight:500;">Normal</span></td>
                                 <td style="font-size:12px;">@fp.Analyst?.Username</td>
                                 <td style="font-size:12px; color:var(--text-muted);">@fp.CreatedAt.ToString("MMM dd, HH:mm")</td>
                                 <td>
                                     <div style="display:flex; gap:6px;">
-                                        <button class="btn btn-outline btn-sm" style="color:var(--ok); border-color:var(--ok);">Approve</button>
-                                        <button class="btn btn-outline btn-sm" style="color:var(--danger); border-color:var(--danger);">Reject</button>
+                                        <button class="btn btn-outline btn-sm" style="color:var(--ok); border-color:var(--ok);" onclick="processFeedback(@fp.Id, 'Approve')">Approve</button>
+                                        <button class="btn btn-outline btn-sm" style="color:var(--danger); border-color:var(--danger);" onclick="processFeedback(@fp.Id, 'Reject')">Reject</button>
                                     </div>
                                 </td>
                             </tr>
@@ -134,3 +141,72 @@
     </div>
 
 </div>
+
+<dialog id="logDetailsModal" style="width: 650px; max-width: 90vw; padding: 0; border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); margin: auto; background: var(--bg-card); color: var(--text-primary);">
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 0.5px solid var(--border); background: var(--bg-page);">
+        <div id="modalTitle" style="font-weight: 600; font-size: 16px;">Log Details</div>
+        <button onclick="document.getElementById('logDetailsModal').close()" style="background:none; border:none; font-size:18px; cursor:pointer; color:var(--text-muted);">&times;</button>
+    </div>
+    <div style="padding: 24px;">
+        <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; font-weight:500;">Raw Payload</div>
+        <pre id="modalRawLog" style="background:#1a1a1a; color:#4ade80; padding:16px; border-radius:8px; font-family:var(--font-mono); font-size:13px; white-space:pre-wrap; word-wrap:break-word; max-height: 300px; overflow-y: auto; margin-bottom: 24px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);"></pre>
+
+        <div style="display:flex; justify-content:flex-end;">
+            <button class="btn btn-outline" onclick="document.getElementById('logDetailsModal').close()">Close Inspection</button>
+        </div>
+    </div>
+</dialog>
+
+<style>
+    dialog::backdrop {
+        background: rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(3px);
+    }
+</style>
+
+@section Scripts {
+    <script>
+        async function processFeedback(feedbackId, actionType) {
+
+            const confirmMessage = actionType === 'Approve'
+                ? "Are you sure you want to approve this? It will be added to the ML retraining dataset."
+                : "Are you sure you want to reject this false positive claim?";
+
+            if (!confirm(confirmMessage)) return;
+
+            const endpoint = actionType === 'Approve'
+                ? '/SocManager/ApproveFalsePositive'
+                : '/SocManager/RejectFalsePositive';
+
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(feedbackId) // Sending the ID directly
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert("✅ " + data.message);
+                    // Refresh the page to update the queues
+                    window.location.reload();
+                } else {
+                    alert("❌ Action failed: " + data.message);
+                }
+            } catch (error) {
+                console.error("API Error:", error);
+                alert("Could not connect to the server.");
+            }
+        }
+        // Modal'ı açan ve verileri içine basan fonksiyon
+        function openLogModal(title, rawLog) {
+            document.getElementById('modalTitle').innerText = title;
+            // Log boşsa "No payload data" yaz, değilse logu bas
+            document.getElementById('modalRawLog').innerText = rawLog || "No raw payload data available for this event.";
+            document.getElementById('logDetailsModal').showModal();
+        }
+    </script>
+}

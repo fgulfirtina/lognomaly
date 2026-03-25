@@ -22,9 +22,14 @@ namespace LogNomaly.Web.Entities.Models
         [MaxLength(50)]
         public string Status { get; set; } = "Open";
 
+        [Required, MaxLength(2000)]
+        public string? ResolutionNotes { get; set; }
+
         public string? AnalystNotes { get; set; }
 
         public DateTime OpenedAt { get; set; } = DateTime.UtcNow;
         public DateTime? ClosedAt { get; set; }
+
+        
     }
 }

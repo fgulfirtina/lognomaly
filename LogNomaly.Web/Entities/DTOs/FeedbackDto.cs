@@ -9,5 +9,6 @@
 
         // "FalsePositive" veya "Investigate"
         public string ActionType { get; init; } = string.Empty;
+        public string? AnalystNotes { get; set; }
     }
 }

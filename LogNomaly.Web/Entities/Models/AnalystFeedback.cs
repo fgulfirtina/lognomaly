@@ -30,9 +30,13 @@ namespace LogNomaly.Web.Entities.Models
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+        [Required, MaxLength(1000)]
+        public string? AnalystNotes { get; set; }
+
         // Yapan Analist ile Bağlantı
         public int AnalystId { get; set; }
         [ForeignKey("AnalystId")]
         public Analyst? Analyst { get; set; }
+        
     }
 }
