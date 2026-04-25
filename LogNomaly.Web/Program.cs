@@ -1,4 +1,5 @@
-using LogNomaly.Web.Data;
+ï»¿using LogNomaly.Web.Data;
+using LogNomaly.Web.Entities.Models;
 using LogNomaly.Web.Services;
 using LogNomaly.Web.Services.Contracts;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -6,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// PostgreSQL Veritabaný Baðlantýsý
+// PostgreSQL VeritabanÄ± BaÄŸlantÄ±sÄ±
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
@@ -14,9 +15,9 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
-        options.LoginPath = "/Auth/Login"; // Giriþ yapmayanlarý buraya atar
+        options.LoginPath = "/Auth/Login"; // GiriÅŸ yapmayanlarÄ± buraya atar
         options.AccessDeniedPath = "/Auth/AccessDenied"; // Yetkisi yetmeyenleri buraya atar
-        options.ExpireTimeSpan = TimeSpan.FromHours(8); // 8 saat sonra otomatik çýkýþ
+        options.ExpireTimeSpan = TimeSpan.FromHours(8); // 8 saat sonra otomatik Ã§Ä±kÄ±ÅŸ
     });
 
 builder.Services.AddControllersWithViews();
@@ -30,12 +31,15 @@ builder.Services.AddSession(options =>
     options.IdleTimeout = TimeSpan.FromMinutes(30);
     options.Cookie.HttpOnly = true;
 });
-// Feedback servisini sisteme tanýtýyoruz
+// Feedback servisini sisteme tanÄ±tÄ±yoruz
 builder.Services.AddScoped<IFeedbackService, FeedbackService>();
+
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("AdminOnly", p => p.RequireRole("Admin"));
 
 var app = builder.Build();
 
-// Hata Yönetimi
+// Hata YÃ¶netimi
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
@@ -46,13 +50,13 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 
-// Routing (Yönlendirme)
+// Routing (YÃ¶nlendirme)
 app.UseRouting();
 
 // Session
 app.UseSession();
 
-// Kimlik Doðrulama ve Yetkilendirme (Sýrasýyla önce kimlik, sonra yetki)
+// Kimlik DoÄŸrulama ve Yetkilendirme (SÄ±rasÄ±yla Ã¶nce kimlik, sonra yetki)
 app.UseAuthentication();
 app.UseAuthorization();
 

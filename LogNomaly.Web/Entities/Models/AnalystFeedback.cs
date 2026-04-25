@@ -20,7 +20,7 @@ namespace LogNomaly.Web.Entities.Models
         [MaxLength(50)]
         public string RiskLevel { get; set; } = string.Empty;
 
-        // "FalsePositive" veya "Investigate"
+        // "FalsePositive", "Investigate", or "Correction"
         [Required, MaxLength(50)]
         public string ActionType { get; set; } = string.Empty;
 
@@ -33,10 +33,17 @@ namespace LogNomaly.Web.Entities.Models
         [Required, MaxLength(1000)]
         public string? AnalystNotes { get; set; }
 
-        // Yapan Analist ile Bağlantı
+        // ─── NEW: Analyst's corrected label for continuous learning ───
+        // Correction Types:
+        //   "Normal"         → False Positive (AI predicted threat, analyst says it's fine)
+        //   "SQLInjection"   → False Negative (AI missed a real threat)
+        //   "DDoS"           → Misclassification (AI said BruteForce, analyst says DDoS)
+        [MaxLength(100)]
+        public string? ProposedLabel { get; set; }
+
+        // Navigation Properties
         public int AnalystId { get; set; }
         [ForeignKey("AnalystId")]
         public Analyst? Analyst { get; set; }
-        
     }
 }

@@ -1,4 +1,5 @@
 ﻿using LogNomaly.Web.Data;
+using LogNomaly.Web.Entities.DTOs;
 using LogNomaly.Web.Entities.Models;
 using LogNomaly.Web.Services.Contracts;
 using LogNomaly.Web.ViewModels;
@@ -39,7 +40,10 @@ namespace LogNomaly.Web.Controllers
                 // Fetch only pending false positives that need model retraining approval
                 PendingFalsePositives = await _context.AnalystFeedbacks
                     .Include(f => f.Analyst)
-                    .Where(f => f.ActionType == "FalsePositive" && f.Status == "Pending")
+                    .Where(f => f.Status == "Pending" &&
+                              (f.ActionType == "Investigate" ||
+                               f.ActionType == "FalsePositive" ||
+                               f.ActionType == "Correction"))
                     .OrderByDescending(f => f.CreatedAt)
                     .ToListAsync()
             };
@@ -170,6 +174,51 @@ namespace LogNomaly.Web.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { success = false, message = "Database error." });
+            }
+        }
+
+        // ── POST /SocManager/SubmitCorrection ────────────────────────────
+        // Called by the "Report Incorrect Prediction" modal in Review.cshtml
+        [HttpPost]
+        public async Task<IActionResult> SubmitCorrection([FromBody] SubmitCorrectionDto dto)
+        {
+            // Resolve the current analyst's ID from the auth cookie/claims
+            var analystIdClaim = User.FindFirst("AnalystId")?.Value
+                              ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (!int.TryParse(analystIdClaim, out int analystId))
+                return Json(new { success = false, message = "Could not identify the current analyst." });
+
+            // Fetch the existing feedback record to copy its raw log / predicted class
+            var existing = await _context.AnalystFeedbacks.FindAsync(dto.FeedbackId);
+            if (existing == null)
+                return Json(new { success = false, message = "Feedback record not found." });
+
+            // Validate the proposed label is an accepted value
+            var allowedLabels = new[] {
+        "Normal", "BruteForce", "SQLInjection", "DDoS",
+        "SystemFailure", "AppError", "HardwareFailure", "UnknownAnomaly"
+    };
+            if (!allowedLabels.Contains(dto.ProposedLabel))
+                return Json(new { success = false, message = "Invalid proposed label." });
+
+            // Update the existing record rather than creating a duplicate
+            existing.ProposedLabel = dto.ProposedLabel;
+            existing.AnalystNotes = dto.AnalystNotes;
+            existing.ActionType = "Correction";
+            existing.Status = "Pending";   // resets to pending for senior review
+
+            try
+            {
+                await _context.SaveChangesAsync();
+                _logger.LogInformation(
+                    "Correction submitted: FeedbackId={Id} ProposedLabel={Label} by Analyst={AnalystId}",
+                    dto.FeedbackId, dto.ProposedLabel, analystId);
+                return Json(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error saving correction for FeedbackId: {Id}", dto.FeedbackId);
+                return Json(new { success = false, message = "Database error while saving correction." });
             }
         }
     }

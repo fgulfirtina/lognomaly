@@ -6,5 +6,6 @@ namespace LogNomaly.Web.Services.Contracts
     {
         // Geri bildirimi kaydeder, başarılıysa true döner
         Task<bool> SubmitFeedbackAsync(FeedbackDto request, int analystId);
+        Task<RetrainResponseDto> TriggerRetrainAsync();
     }
 }

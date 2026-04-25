@@ -149,11 +149,46 @@
         </div>
 
         <div class="card" style="margin-top:24px; display:flex; justify-content:center; align-items:center; gap:16px; background:var(--bg-page);">
-            <button class="btn btn-outline" onclick="flagFalsePositive()" style="border-radius:20px; background:white;">Flag as False Positive</button>
+            <button class="btn btn-warning" onclick="openCorrectionModal()" style="border-radius:20px; padding:10px 20px; font-weight:bold; background:#f59e0b; color:white; border:none;">⚠ Report Incorrect Prediction</button>
             <button class="btn btn-primary" onclick="startInvestigation()" style="border-radius:20px; padding:10px 30px;">🔍 Start Investigation</button>
         </div>
     </div>
 }
+
+<dialog id="correctionModal" class="native-modal">
+    <form method="dialog" id="correctionForm">
+        <h3>⚠ Report Incorrect Prediction</h3>
+
+        <div class="readonly-banner" style="background: #f1f5f9; padding: 10px; border-radius: 6px; margin-bottom: 15px;">
+            <small style="color:var(--text-muted)">Current AI Prediction:</small>
+            <strong id="modalCurrentAiPred" style="color:var(--danger); display:block; font-size:16px;">@(Model.Result?.PredictedClass ?? "Unknown")</strong>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 15px;">
+            <label for="proposedLabel" style="display:block; margin-bottom:5px; font-size:13px; font-weight:bold;">Proposed Correct Label:</label>
+            <select id="proposedLabel" style="width:100%; padding:8px; border-radius:4px; border:1px solid var(--border);" required onchange="updateDynamicHint()">
+                <option value="">-- Select Label --</option>
+                <option value="Normal">Normal</option>
+                <option value="BruteForce">BruteForce</option>
+                <option value="SQLInjection">SQLInjection</option>
+                <option value="DDoS">DDoS</option>
+                <option value="SystemFailure">SystemFailure</option>
+                <option value="UnknownAnomaly">UnknownAnomaly</option>
+            </select>
+            <small id="dynamicHint" style="display:block; margin-top:5px; font-weight:bold;"></small>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 15px;">
+            <label for="analystNotes" style="display:block; margin-bottom:5px; font-size:13px; font-weight:bold;">Justification (Min 10 chars):</label>
+            <textarea id="analystNotes" minlength="10" required placeholder="Explain why the AI is wrong..." style="width:100%; padding:8px; border-radius:4px; border:1px solid var(--border); min-height:80px;"></textarea>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+            <button type="button" class="btn btn-outline" onclick="document.getElementById('correctionModal').close()">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="submitCorrection()">Submit Correction</button>
+        </div>
+    </form>
+</dialog>
 
 @section Scripts {
     <script>
@@ -170,10 +205,21 @@
                     btnIcon.innerText = "❐";
                 }, 2000);
             });
+        }     
+
+        function startInvestigation() {
+            const notes = prompt("Vaka (Investigation) başlatılıyor. Varsa ön notlarınızı girebilirsiniz (Opsiyonel):");
+            if (notes !== null) {
+                sendActionToBackend("Investigate", notes);
+            }
+            if(confirm("Bu log için resmi bir inceleme (vaka) başlatmak istediğinize emin misiniz?")) {
+                sendActionToBackend("Investigate");
+            }
         }
 
-        async function sendActionToBackend(actionType, notes = "") {
-            var shortId = Model.SessionId?.Substring(0, Math.Min(Model.SessionId.Length, 8)) ?? "Unknown";
+        // YENİ: Backend'e istek atarken ProposedLabel'ı da yolluyoruz
+        async function sendActionToBackend(actionType, notes = "", proposedLabel = null) {
+            var shortId = '@(Model.SessionId)' ? '@(Model.SessionId)'.substring(0, 8) : "Unknown";
             const logId = shortId;
             const rawLog = document.getElementById('rawLog') ? document.getElementById('rawLog').innerText.trim() : "Log bulunamadı";
             const predictedClass = "@(Model.Result?.PredictedClass ?? "Unknown")";
@@ -185,7 +231,8 @@
                 PredictedClass: predictedClass,
                 RiskLevel: riskLevel,
                 ActionType: actionType,
-                AnalystNotes: notes
+                AnalystNotes: notes,
+                ProposedLabel: proposedLabel // YENİ EKLENEN VERİ
             };
 
             try {
@@ -201,7 +248,8 @@
                     if (actionType === 'Investigate') {
                         alert("✅ Vaka başarıyla oluşturuldu! Log, Analist paneline atandı.");
                     } else {
-                        alert("✅ Log 'False Positive' olarak işaretlendi. Model eğitimi için karantinaya alındı!");
+                        alert("✅ Log düzeltmesi SOC Manager onayına gönderildi. Onaylandığında model yeniden eğitilecek!");
+                        document.getElementById('correctionModal').close();
                     }
                 } else {
                     alert("❌ İşlem başarısız: " + data.message);
@@ -212,30 +260,50 @@
             }
         }
 
-        function startInvestigation() {
-            const notes = prompt("Vaka (Investigation) başlatılıyor. Varsa ön notlarınızı girebilirsiniz (Opsiyonel):");
-            if (notes !== null) {
-                sendActionToBackend("Investigate", notes);
-            }
-            if(confirm("Bu log için resmi bir inceleme (vaka) başlatmak istediğinize emin misiniz?")) {
-                sendActionToBackend("Investigate");
+        // YENİ MODAL FONKSİYONLARI
+        function openCorrectionModal() {
+            document.getElementById('correctionModal').showModal();
+        }
+
+        function updateDynamicHint() {
+            const aiPred = "@(Model.Result?.PredictedClass ?? "Unknown")";
+            const proposed = document.getElementById('proposedLabel').value;
+            const hintEl = document.getElementById('dynamicHint');
+
+            if (!proposed) { hintEl.innerText = ""; return; }
+
+            const isAiThreat = aiPred !== "Normal";
+            const isNewThreat = proposed !== "Normal";
+
+            if (isAiThreat && !isNewThreat) {
+                hintEl.innerText = "💡 This will be logged as a False Positive.";
+                hintEl.style.color = "green";
+            } else if (!isAiThreat && isNewThreat) {
+                hintEl.innerText = "🚨 This will be logged as a False Negative!";
+                hintEl.style.color = "red";
+            } else {
+                hintEl.innerText = "🔄 This will be logged as a Misclassification.";
+                hintEl.style.color = "orange";
             }
         }
 
-        function flagFalsePositive() {
-            const reason = prompt("Lütfen bu olayın neden 'False Positive' (Yanlış Alarm) olduğunu açıklayın (Zorunlu):");
+        function submitCorrection() {
+            const proposed = document.getElementById('proposedLabel').value;
+            const notes = document.getElementById('analystNotes').value;
 
-            if (reason === null) {
-                return; // Kullanıcı Cancel/İptal tuşuna bastı
+            if (!proposed) {
+                alert("Please select a proposed label.");
+                return;
             }
-
-            if (reason.trim() === "") {
-                alert("❌ İşlem reddedildi: False Positive bildirimi için geçerli bir gerekçe yazmak zorundasınız.");
+            if (!notes || notes.trim().length < 10) {
+                alert("Please provide a justification (minimum 10 characters).");
                 return;
             }
 
-            if(confirm("Bu log'u için False Positive olarak işaretlemek istediğinize emin misiniz?")) {
-                sendActionToBackend("FalsePositive", reason);
+            if(confirm("Are you sure you want to submit this correction for model retraining?")) {
+                sendActionToBackend("Correction", notes, proposed); // ActionType artık 'Correction'
             }
+        }
+
     </script>
 }

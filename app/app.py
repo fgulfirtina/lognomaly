@@ -10,6 +10,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from scipy.sparse import hstack, csr_matrix
+from retrain_endpoint import register_retrain_endpoint
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
@@ -132,9 +133,12 @@ except Exception as e:
 try:
     bundles["HDFS"].load()
 except Exception as e:
-    logger.warning(f"HDFS Modeli Henüz Yok (Eğitim bitmediyse normaldir): {e}")
+    logger.warning(f"HDFS Modeli Henüz Yok: {e}")
 
 rule_engine = RuleEngine()
+
+
+register_retrain_endpoint(app, bundles, MODEL_DIR)
 
 # ======================================================================
 #  Yardımcı Fonksiyon (Akıllı Yönlendirme)

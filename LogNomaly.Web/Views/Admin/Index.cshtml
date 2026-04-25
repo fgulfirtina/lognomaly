@@ -1,0 +1,132 @@
+﻿@model LogNomaly.Web.ViewModels.AdminDashboardViewModel
+@{
+    ViewData["Title"] = "System Administration";
+}
+
+<div class="admin-header">
+    <h1>⚙️ System Administration & Health</h1>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert-success" style="background:var(--ok); color:white; padding:10px; margin-bottom:15px; border-radius:5px;">
+        ✅ @TempData["Success"]
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert-error" style="background:var(--danger); color:white; padding:10px; margin-bottom:15px; border-radius:5px;">
+        ❌ @TempData["Error"]
+    </div>
+}
+
+<div class="kpi-grid">
+    <div class="kpi-card">
+        <h3>Total Analysts</h3>
+        <p class="kpi-value">@Model.TotalAnalysts</p>
+        <small class="text-muted">@Model.SeniorAnalysts Senior | @Model.JuniorAnalysts Junior</small>
+    </div>
+
+    <div class="kpi-card">
+        <h3>Investigations</h3>
+        <p class="kpi-value">@Model.PendingInvestigations</p>
+        <small class="text-muted">@Model.OpenCases Open Cases</small>
+    </div>
+
+    <div class="kpi-card corrections-card">
+        <h3>Corrections Ready</h3>
+        <p class="kpi-value">@Model.CorrectionsReadyToTrain</p>
+        @if (Model.CorrectionsReadyToTrain > 0)
+        {
+            <form method="post" action="/Admin/TriggerRetrain">
+                <button type="submit" class="btn-danger retrain-btn">🚀 Trigger AI Retrain</button>
+            </form>
+        }
+        else
+        {
+            <small>AI is up-to-date.</small>
+        }
+    </div>
+
+    <div class="kpi-card health-card">
+        <h3>Infrastructure Status</h3>
+        <ul>
+            <li>
+                PostgreSQL DB:
+                <span class="@(Model.DatabaseOnline ? "status-ok" : "status-error")">
+                    @(Model.DatabaseOnline ? "🟢 Online" : "🔴 Offline")
+                </span>
+            </li>
+            <li>
+                Python AI API:
+                <span class="@(Model.PythonApiOnline ? "status-ok" : "status-error")">
+                    @(Model.PythonApiOnline ? "🟢 Online" : "🔴 Offline")
+                </span>
+                @if (!string.IsNullOrEmpty(Model.PythonApiStatus))
+                {
+                    <br />
+                
+                    <small class="text-muted">@Model.PythonApiStatus</small>
+                }
+            </li>
+        </ul>
+    </div>
+</div>
+
+<div class="roster-section">
+    <div class="roster-header">
+        <h2>Analyst Roster</h2>
+        <button class="btn-primary" onclick="document.getElementById('newUserModal').showModal()">+ Add Analyst</button>
+    </div>
+
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th>Created At</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var user in Model.Analysts)
+                {
+                    <tr>
+                        <td>@user.Username</td>
+                        <td><span class="role-badge @user.Role.ToLower()">@user.Role</span></td>
+                        <td>@user.CreatedAt.ToString("yyyy-MM-dd")</td>
+                        <td class="action-cells">
+                            <button class="btn-sm btn-info" onclick="openRoleModal('@user.Id', '@user.Role')">Change Role</button>
+                            <button class="btn-sm btn-warning">Reset Pwd</button>
+                            <button class="btn-sm btn-danger">Delete</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<dialog id="newUserModal" class="native-modal">
+    <form method="post" action="/Admin/CreateAnalyst">
+        @Html.AntiForgeryToken()
+        <h3>Add New Analyst</h3>
+        <div class="form-group">
+            <label>Username:</label>
+            <input name="username" required />
+        </div>
+        <div class="form-group">
+            <label>Initial Role:</label>
+            <select name="role">
+                <option value="Junior">Junior Analyst</option>
+                <option value="Senior">Senior Analyst</option>
+                <option value="Admin">System Admin</option>
+            </select>
+        </div>
+        <div class="modal-actions">
+            <button type="button" onclick="document.getElementById('newUserModal').close()">Cancel</button>
+            <button type="submit" class="btn-primary">Create User</button>
+        </div>
+    </form>
+</dialog>
