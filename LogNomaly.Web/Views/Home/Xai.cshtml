@@ -160,15 +160,35 @@
 
 		<div class="form-group" style="margin-bottom: 15px;">
 			<label for="proposedLabel" style="display:block; margin-bottom:5px; font-size:13px; font-weight:bold;">Proposed Correct Label:</label>
+
 			<select id="proposedLabel" style="width:100%; padding:8px; border-radius:4px; border:1px solid var(--border);" required onchange="updateDynamicHint()">
 				<option value="">-- Select Label --</option>
-				<option value="Normal">Normal</option>
-				<option value="BruteForce">BruteForce</option>
-				<option value="SQLInjection">SQLInjection</option>
-				<option value="DDoS">DDoS</option>
-				<option value="SystemFailure">SystemFailure</option>
-				<option value="UnknownAnomaly">UnknownAnomaly</option>
+
+				@if (ViewBag.DynamicLabels != null)
+				{
+					foreach (var label in ViewBag.DynamicLabels)
+					{
+						<option value="@label">@label</option>
+					}
+				}
+				else
+				{
+					<option value="Normal">Normal</option>
+					<option value="BruteForce">BruteForce</option>
+					<option value="SQLInjection">SQLInjection</option>
+					<option value="DDoS">DDoS</option>
+					<option value="SystemFailure">SystemFailure</option>
+					<option value="UnknownAnomaly">TemporalAnomaly</option>
+				}
+
+				<option disabled>──────────</option>
+				<option value="OTHER">➕ Other (Custom Threat)...</option>
 			</select>
+
+			<input type="text" id="customLabelInput" class="form-control"
+				   style="display:none; margin-top: 10px; width:100%; padding:8px; border-radius:4px; border:1px dashed var(--warn); background-color: #fffdf5;"
+				   placeholder="Type exact threat name (e.g., CryptoMining)..." />
+
 			<small id="dynamicHint" style="display:block; margin-top:5px; font-weight:bold;"></small>
 		</div>
 
@@ -239,7 +259,7 @@
 
 				if (data.success) {
 					if (actionType === 'Investigate') {
-						alert("✅ Case created scuccessfulluy! Log, is assigned to Analyst panel.");
+						alert("✅ Case created successfully! Log, is assigned to Analyst panel.");
 					} else {
 						alert("✅ Log correction is sent to SOC Manager for approval. If approved, model will be retrained!");
 						document.getElementById('correctionModal').close();
@@ -257,36 +277,61 @@
 			document.getElementById('correctionModal').showModal();
 		}
 
+		// Hint and custom label
 		function updateDynamicHint() {
 			const aiPred = "@(Model.Result?.PredictedClass ?? "Unknown")";
-			const proposed = document.getElementById('proposedLabel').value;
+			const selectValue = document.getElementById('proposedLabel').value;
+			const customInput = document.getElementById('customLabelInput');
 			const hintEl = document.getElementById('dynamicHint');
 
-			if (!proposed) { hintEl.innerText = ""; return; }
+			if (selectValue === "OTHER") {
+				customInput.style.display = "block";
+				customInput.focus();
+			} else {
+				customInput.style.display = "none";
+				customInput.value = "";
+			}
+
+			if (!selectValue) { hintEl.innerText = ""; return; }
 
 			const isAiThreat = aiPred !== "Normal";
-			const isNewThreat = proposed !== "Normal";
+			const isNewThreat = selectValue !== "Normal";
 
 			if (isAiThreat && !isNewThreat) {
 				hintEl.innerText = "💡 This will be logged as a False Positive.";
-				hintEl.style.color = "green";
+				hintEl.style.color = "var(--ok, green)";
 			} else if (!isAiThreat && isNewThreat) {
 				hintEl.innerText = "🚨 This will be logged as a False Negative!";
-				hintEl.style.color = "red";
+				hintEl.style.color = "var(--danger, red)";
 			} else {
 				hintEl.innerText = "🔄 This will be logged as a Misclassification.";
-				hintEl.style.color = "orange";
+				hintEl.style.color = "var(--warn, orange)";
+			}
+
+			if (selectValue === "OTHER") {
+				hintEl.innerText += " (Defining a custom threat class)";
 			}
 		}
 
 		function submitCorrection() {
-			const proposed = document.getElementById('proposedLabel').value;
+			let proposed = document.getElementById('proposedLabel').value;
 			const notes = document.getElementById('analystNotes').value;
+			const customInput = document.getElementById('customLabelInput').value.trim();
 
 			if (!proposed) {
 				alert("Please select a proposed label.");
 				return;
 			}
+
+			if (proposed === "OTHER") {
+				if (!customInput) {
+					alert("Please type the name of the custom threat.");
+					document.getElementById('customLabelInput').focus();
+					return;
+				}
+				proposed = customInput;
+			}
+
 			if (!notes || notes.trim().length < 10) {
 				alert("Please provide a justification (minimum 10 characters).");
 				return;

@@ -41,8 +41,7 @@ namespace LogNomaly.Web.Controllers
                 PendingCorrections = await _context.AnalystFeedbacks
                     .Include(f => f.Analyst)
                     .Where(f => f.Status == "Pending" &&
-                              (f.ActionType == "Investigate" ||
-                               f.ActionType == "FalsePositive" ||
+                              (f.ActionType == "FalsePositive" ||
                                f.ActionType == "Correction"))
                     .OrderByDescending(f => f.CreatedAt)
                     .ToListAsync()

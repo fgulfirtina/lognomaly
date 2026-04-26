@@ -35,17 +35,26 @@
         <div class="page-subtitle">Reported by @fb.Analyst?.Username on @fb.CreatedAt.ToString("MMM dd, yyyy HH:mm")</div>
     </div>
 
-    <div style="display:flex; gap:10px;">
-        @if (fb.Status == "Resolved" || fb.Status == "Closed")
+    <div style="display:flex; gap:10px; align-items: flex-end;">
+        @if (fb.Status == "Resolved" || fb.Status == "Closed" || fb.Status == "Approved")
         {
-            <span class="risk-badge" style="background:var(--ok); color:white; padding:8px 16px; font-size:13px;">
-                🔒 This Incident is Officially Closed
+            <span class="risk-badge" style="background:var(--ok); color:white; padding:8px 16px; font-size:13px; border-radius: 4px;">
+                🔒 This Incident is Officially Closed/Resolved
             </span>
         }
         else if (fb.ActionType == "FalsePositive" || fb.ActionType == "Correction")
         {
-            <button class="btn" style="background:var(--ok); color:white; border:none;" onclick="processFeedback(@fb.Id, 'Approve')">✓ Approve & Retrain</button>
-            <button class="btn" style="background:var(--danger); color:white; border:none;" onclick="processFeedback(@fb.Id, 'Reject')">⊘ Reject</button>
+            <div style="display:flex; flex-direction:column; gap:5px;">
+                <label style="font-size:12px; font-weight:bold; color:var(--warn);">Final Label to Train:</label>
+                <div style="display:flex; gap:10px;">
+                    <input type="text" id="finalLabelInput" class="form-control"
+                           value="@(string.IsNullOrEmpty(fb.ProposedLabel) ? "Normal" : fb.ProposedLabel)"
+                           style="width: 180px; padding: 8px; border: 1px solid var(--border); border-radius: 4px;" />
+
+                    <button class="btn" style="background:var(--ok); color:white; border:none;" onclick="approveWithLabel(@fb.Id)">✓ Approve & Retrain</button>
+                    <button class="btn" style="background:var(--danger); color:white; border:none;" onclick="processFeedback(@fb.Id, 'Reject')">⊘ Reject</button>
+                </div>
+            </div>
         }
         else if (fb.ActionType == "Investigate")
         {
@@ -216,6 +225,25 @@
                 }
             } catch (error) {
                 alert("Server connection failed.");
+            }
+        }
+
+        async function approveWithLabel(id) {
+            let finalLabel = document.getElementById("finalLabelInput").value.trim();
+            if (!finalLabel) {
+                alert("Final label cannot be empty.");
+                return;
+            }
+
+            if (confirm("Approve this correction with label '" + finalLabel + "'?")) {
+                const response = await fetch(`/SocManager/ApproveCase`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `feedbackId=${id}&finalLabel=${encodeURIComponent(finalLabel)}&__RequestVerificationToken=${document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''}`
+                });
+
+                if(response.ok) window.location.href = '/SocManager/Index';
+                else alert("Failed to approve. Check server logs.");
             }
         }
     </script>
