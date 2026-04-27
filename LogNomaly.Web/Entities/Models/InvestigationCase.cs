@@ -14,7 +14,7 @@ namespace LogNomaly.Web.Entities.Models
         public AnalystFeedback? Feedback { get; set; }
 
         // Which analyst is assigned to the case
-        public int AssignedAnalystId { get; set; }
+        public int? AssignedAnalystId { get; set; }
         [ForeignKey("AssignedAnalystId")]
         public Analyst? AssignedAnalyst { get; set; }
 

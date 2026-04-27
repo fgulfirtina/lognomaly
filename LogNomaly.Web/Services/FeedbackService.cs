@@ -31,6 +31,9 @@ namespace LogNomaly.Web.Services
         {
             try
             {
+                var creator = await _context.Analysts.FindAsync(analystId);
+                bool isSenior = creator != null && (creator.Role == "Senior");
+
                 var feedback = new AnalystFeedback
                 {
                     LogId = request.LogId,
@@ -54,7 +57,7 @@ namespace LogNomaly.Web.Services
                     var newCase = new InvestigationCase
                     {
                         FeedbackId = feedback.Id,
-                        AssignedAnalystId = analystId,
+                        AssignedAnalystId = isSenior ? analystId : null, // if senior opens case it is assigned to them, if junior opens the case it is in the pool
                         Status = "Open",
                         OpenedAt = DateTime.UtcNow,
                         AnalystNotes = "Auto-generated case from SOC Dashboard.",
@@ -65,14 +68,14 @@ namespace LogNomaly.Web.Services
                 }
 
                 _logger.LogInformation(
-                    "Feedback saved for LogId: {LogId} by Analyst: {AnalystId} | ProposedLabel: {Label}",
+                    "Case saved for LogId: {LogId} by Analyst: {AnalystId} | ProposedLabel: {Label}",
                     request.LogId, analystId, request.ProposedLabel ?? "N/A");
 
                 return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error saving feedback for LogId: {LogId}", request.LogId);
+                _logger.LogError(ex, "Error saving case for LogId: {LogId}", request.LogId);
                 return false;
             }
         }

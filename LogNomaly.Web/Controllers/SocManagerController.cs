@@ -6,6 +6,7 @@ using LogNomaly.Web.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace LogNomaly.Web.Controllers
 {
@@ -27,12 +28,16 @@ namespace LogNomaly.Web.Controllers
         [HttpGet]
         public async Task<IActionResult> Index()
         {
+            var currentUserIdStr = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+            int.TryParse(currentUserIdStr, out int currentUserId);
+
             var viewModel = new SocManagerViewModel
             {
                 // Fetch cases with their assigned analysts and the original feedback/log
                 ActiveCases = await _context.InvestigationCases
                 .Include(c => c.AssignedAnalyst)
                 .Include(c => c.Feedback)
+                .Where(c => c.AssignedAnalystId == null || c.AssignedAnalystId == currentUserId)
                 .Where(c => c.Status != "Resolved" && c.Status != "Closed")
                 .OrderByDescending(c => c.OpenedAt)
                 .ToListAsync(),
@@ -194,9 +199,9 @@ namespace LogNomaly.Web.Controllers
 
             // Validate the proposed label is an accepted value
             var allowedLabels = new[] {
-        "Normal", "BruteForce", "SQLInjection", "DDoS",
-        "SystemFailure", "AppError", "HardwareFailure", "UnknownAnomaly"
-    };
+            "Normal", "BruteForce", "SQLInjection", "DDoS",
+            "SystemFailure", "AppError", "HardwareFailure", "UnknownAnomaly"
+            };
             if (!allowedLabels.Contains(dto.ProposedLabel))
                 return Json(new { success = false, message = "Invalid proposed label." });
 
@@ -219,6 +224,23 @@ namespace LogNomaly.Web.Controllers
                 _logger.LogError(ex, "Error saving correction for FeedbackId: {Id}", dto.FeedbackId);
                 return Json(new { success = false, message = "Database error while saving correction." });
             }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ClaimCase([FromForm] int caseId)
+        {
+            var currentUserIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(currentUserIdStr, out int currentUserId)) return Unauthorized();
+
+            var invCase = await _context.InvestigationCases.FindAsync(caseId);
+            if (invCase == null) return NotFound();
+
+            // Assign the case to the senior
+            invCase.AssignedAnalystId = currentUserId;
+            await _context.SaveChangesAsync();
+
+            return RedirectToAction(nameof(Index));
         }
     }
 }
