@@ -251,10 +251,12 @@
             }
 
             if (confirm("Approve this correction with label '" + finalLabel + "'?")) {
-                const response = await fetch(`/SocManager/ApproveCase`, {
+                const response = await fetch(`/SocManager/ApproveFalsePositive`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: `feedbackId=${id}&finalLabel=${encodeURIComponent(finalLabel)}&__RequestVerificationToken=${document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''}`
+                    headers: {
+                    'Content-Type': 'application/json' 
+                    },
+                    body: JSON.stringify(id)
                 });
 
                 if(response.ok) window.location.href = '/SocManager/Index';

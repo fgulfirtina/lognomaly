@@ -38,9 +38,9 @@
         <p class="kpi-value">@Model.CorrectionsReadyToTrain</p>
         @if (Model.CorrectionsReadyToTrain > 0)
         {
-            <form method="post" action="/Admin/TriggerRetrain">
-                <button type="submit" class="btn-danger retrain-btn">🚀 Trigger AI Retrain</button>
-            </form>
+            <button type="button" class="btn-danger retrain-btn" onclick="startRetrain()" style="background-color: var(--accent); color: #111; font-weight: 600;">
+                🚀 Trigger AI Retrain
+            </button>
         }
         else
         {
@@ -211,5 +211,41 @@
                 alert('A network error occurred.');
             }
         }
+
+        async function startRetrain() {
+            if (!confirm("Are you sure you want to start retraining?")) return;
+
+            try {
+                const response = await fetch('/Admin/TriggerRetrain', {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                // Success or error
+                if (data.success) {
+                    alert("✅ Training successful!\n\n" + data.message);
+                } else {
+
+                    let errorMsg = "❌ Training failed!\n\n" + data.message;
+
+                    if (data.details) {
+ 
+                        try {
+                            let parsedDetails = JSON.parse(data.details);
+                            errorMsg += "\n\Details:\n" + JSON.stringify(parsedDetails, null, 2);
+                        } catch {
+                            errorMsg += "\n\Details:\n" + data.details;
+                        }
+                    }
+
+                    alert(errorMsg);
+                }
+            } catch (error) {
+                console.error("API Error:", error);
+                alert("❌ Failed to connect to server.");
+            }
+        }
+
     </script>
 }
