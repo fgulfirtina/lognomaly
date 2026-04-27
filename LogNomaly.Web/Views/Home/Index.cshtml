@@ -15,7 +15,7 @@
                 🧠 AI Pipeline: <strong style="color:var(--text-primary);">@(Model.Stats?.DatasetRouted ?? "Auto") Model</strong>
             </div>
 
-            @* Rapor Dışa Aktarma Butonu *@
+            @* Report Export Button *@
             <button onclick="exportReport()" class="btn btn-primary btn-sm" style="border-radius:20px; padding: 8px 18px; background: var(--text-primary); color: white;">
                 📄 Export Incident Report
             </button>
@@ -185,7 +185,7 @@ else
 
 @section Scripts {
 <script>
-    // 1. Rapor Dışa Aktarma Fonksiyonu
+    // 1. Export report function
     function exportReport() {
         const sessionId = "@Model.SessionId";
         if (sessionId) {
@@ -195,7 +195,7 @@ else
         }
     }
 
-    // 2. Donut Chart Çizimi
+    // 2. Donut Chart
     (function() {
         var statsData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Stats?.RiskDistribution ?? new Dictionary<string,int>()));
         var canvas = document.getElementById('donutChart');

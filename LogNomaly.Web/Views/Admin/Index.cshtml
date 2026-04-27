@@ -1,0 +1,251 @@
+﻿@model LogNomaly.Web.ViewModels.AdminDashboardViewModel
+@{
+    ViewData["Title"] = "System Administration";
+}
+
+<div class="admin-header">
+    <h1>⚙️ System Administration & Health</h1>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert-success" style="background:var(--ok); color:white; padding:10px; margin-bottom:15px; border-radius:5px;">
+        ✅ @TempData["Success"]
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert-error" style="background:var(--danger); color:white; padding:10px; margin-bottom:15px; border-radius:5px;">
+        ❌ @TempData["Error"]
+    </div>
+}
+
+<div class="kpi-grid">
+    <div class="kpi-card">
+        <h3>Total Analysts</h3>
+        <p class="kpi-value">@Model.TotalAnalysts</p>
+        <small class="text-muted">@Model.SeniorAnalysts Senior | @Model.JuniorAnalysts Junior</small>
+    </div>
+
+    <div class="kpi-card">
+        <h3>Investigations</h3>
+        <p class="kpi-value">@Model.PendingInvestigations</p>
+        <small class="text-muted">@Model.OpenCases Open Cases</small>
+    </div>
+
+    <div class="kpi-card corrections-card">
+        <h3>Corrections Ready</h3>
+        <p class="kpi-value">@Model.CorrectionsReadyToTrain</p>
+        @if (Model.CorrectionsReadyToTrain > 0)
+        {
+            <button type="button" class="btn-danger retrain-btn" onclick="startRetrain()" style="background-color: var(--accent); color: #111; font-weight: 600;">
+                🚀 Trigger AI Retrain
+            </button>
+        }
+        else
+        {
+            <small>AI is up-to-date.</small>
+        }
+    </div>
+
+    <div class="kpi-card health-card">
+        <h3>Infrastructure Status</h3>
+        <ul>
+            <li>
+                PostgreSQL DB:
+                <span class="@(Model.DatabaseOnline ? "status-ok" : "status-error")">
+                    @(Model.DatabaseOnline ? "🟢 Online" : "🔴 Offline")
+                </span>
+            </li>
+            <li>
+                Python AI API:
+                <span class="@(Model.PythonApiOnline ? "status-ok" : "status-error")">
+                    @(Model.PythonApiOnline ? "🟢 Online" : "🔴 Offline")
+                </span>
+                @if (!string.IsNullOrEmpty(Model.PythonApiStatus))
+                {
+                    <br />
+                
+                    <small class="text-muted">@Model.PythonApiStatus</small>
+                }
+            </li>
+        </ul>
+    </div>
+</div>
+
+<div class="roster-section">
+    <div class="roster-header">
+        <h2>Analyst Roster</h2>
+        <button class="btn-primary" onclick="document.getElementById('newUserModal').showModal()">+ Add Analyst</button>
+    </div>
+
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th>Created At</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var user in Model.Analysts)
+                {
+                    <tr>
+                        <td>@user.Username</td>
+                        <td><span class="role-badge @user.Role.ToLower()">@user.Role</span></td>
+                        <td>@user.CreatedAt.ToString("yyyy-MM-dd")</td>
+                        <td class="action-cells">
+                            <button class="btn-sm btn-info" onclick="openRoleModal('@user.Id', '@user.Role', '@user.Username')">Change Role</button>
+                            <button class="btn-sm btn-warning" onclick="resetPassword('@user.Id', '@user.Username')">Reset Pwd</button>
+                            <button class="btn-sm btn-danger" onclick="openDeleteModal('@user.Id', '@user.Username')">Delete</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<dialog id="newUserModal" class="native-modal">
+    <form method="post" action="/Admin/CreateAnalyst">
+        @Html.AntiForgeryToken()
+        <h3>Add New Analyst</h3>
+        <div class="form-group">
+            <label>Username:</label>
+            <input name="username" required />
+        </div>
+        <div class="form-group">
+            <label>Initial Role:</label>
+            <select name="role">
+                <option value="Junior">Junior Analyst</option>
+                <option value="Senior">Senior Analyst</option>
+                <option value="Admin">System Admin</option>
+            </select>
+        </div>
+        <div class="modal-actions">
+            <button type="button" onclick="document.getElementById('newUserModal').close()">Cancel</button>
+            <button type="submit" class="btn-primary">Create User</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog id="roleModal" class="native-modal">
+    <form method="post" action="/Admin/AssignRole">
+        @Html.AntiForgeryToken()
+        <input type="hidden" id="roleUserId" name="AnalystId" />
+        <h3>Change Analyst Role</h3>
+        <p>Changing role for: <strong id="roleUsernameDisplay"></strong></p>
+        <div class="form-group">
+            <label>New Role:</label>
+            <select id="roleSelect" name="role">
+                <option value="Junior">Junior Analyst</option>
+                <option value="Senior">Senior Analyst</option>
+                <option value="Admin">System Admin</option>
+            </select>
+        </div>
+        <div class="modal-actions" style="margin-top: 20px;">
+            <button type="button" class="btn-outline" onclick="document.getElementById('roleModal').close()">Cancel</button>
+            <button type="submit" class="btn-primary">Update Role</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog id="deleteModal" class="native-modal">
+    <form method="post" action="/Admin/DeleteAnalyst">
+        @Html.AntiForgeryToken()
+        <input type="hidden" id="deleteUserId" name="AnalystId" />
+        <h3 style="color: var(--danger);">⚠ Delete Analyst</h3>
+        <p>Are you sure you want to permanently delete <strong id="deleteUsernameDisplay"></strong>?</p>
+        <p style="font-size: 12px; color: var(--text-muted);">This action cannot be undone. Their past SOC logs will remain, but their login access will be revoked.</p>
+        <div class="modal-actions" style="margin-top: 20px;">
+            <button type="button" class="btn-outline" onclick="document.getElementById('deleteModal').close()">Cancel</button>
+            <button type="submit" class="btn-danger" style="background-color: var(--danger); color: white;">Yes, Delete User</button>
+        </div>
+    </form>
+</dialog>
+
+@section Scripts {
+    <script>
+        // 1. Role update modal function
+        function openRoleModal(userId, currentRole, username) {
+            document.getElementById('roleUserId').value = userId;
+            document.getElementById('roleUsernameDisplay').innerText = username;
+            document.getElementById('roleSelect').value = currentRole;
+            document.getElementById('roleModal').showModal();
+        }
+
+        // 2. Delete model function
+        function openDeleteModal(userId, username) {
+            document.getElementById('deleteUserId').value = userId;
+            document.getElementById('deleteUsernameDisplay').innerText = username;
+            document.getElementById('deleteModal').showModal();
+        }
+
+        // 3. Password reset function
+        async function resetPassword(userId, username) {
+            if (!confirm(`Are you sure you want to reset the password for ${username}? A new temporary password will be generated.`)) {
+                return;
+            }
+
+            try {
+                // Send a request to /Admin/ResetPassword
+                const response = await fetch('/Admin/ResetPassword', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    // Send the anti-forgery token
+                    body: `AnalystId=${userId}&__RequestVerificationToken=${document.querySelector('input[name="__RequestVerificationToken"]').value}`
+                });
+
+                if (response.ok) {
+                    // Reload the page to display temp password
+                    window.location.reload();
+                } else {
+                    alert('Failed to reset password. Please check the server logs.');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('A network error occurred.');
+            }
+        }
+
+        async function startRetrain() {
+            if (!confirm("Are you sure you want to start retraining?")) return;
+
+            try {
+                const response = await fetch('/Admin/TriggerRetrain', {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                // Success or error
+                if (data.success) {
+                    alert("✅ Training successful!\n\n" + data.message);
+                } else {
+
+                    let errorMsg = "❌ Training failed!\n\n" + data.message;
+
+                    if (data.details) {
+ 
+                        try {
+                            let parsedDetails = JSON.parse(data.details);
+                            errorMsg += "\n\Details:\n" + JSON.stringify(parsedDetails, null, 2);
+                        } catch {
+                            errorMsg += "\n\Details:\n" + data.details;
+                        }
+                    }
+
+                    alert(errorMsg);
+                }
+            } catch (error) {
+                console.error("API Error:", error);
+                alert("❌ Failed to connect to server.");
+            }
+        }
+
+    </script>
+}

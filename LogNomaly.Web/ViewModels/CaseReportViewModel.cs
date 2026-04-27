@@ -6,5 +6,7 @@ namespace LogNomaly.Web.ViewModels
     {
         public AnalystFeedback? FeedbackRecord { get; set; }
         public AnalysisResult? AiInsight { get; set; }
+
+        public InvestigationCase? InvestigationRecord { get; set; }
     }
 }

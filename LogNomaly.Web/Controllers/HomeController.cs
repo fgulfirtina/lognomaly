@@ -36,7 +36,7 @@ namespace LogNomaly.Web.Controllers
             return View(vm);
         }
 
-        // ── Log Upload & Analiz Sayfası ──────────────────────────────────
+        // ── Log Upload & Analyze Page ──────────────────────────────────
         public IActionResult Analyze()
         {
             return View(new AnalyzeViewModel());
@@ -54,6 +54,20 @@ namespace LogNomaly.Web.Controllers
                 return View(vm);
             }
 
+            using (var stream = logFile.OpenReadStream())
+            using (var reader = new StreamReader(stream))
+            {
+                // Read the first line for pattern check
+                string? firstLine = await reader.ReadLineAsync();
+
+                if (string.IsNullOrWhiteSpace(firstLine) ||
+                   (!firstLine.Contains("blk_") && !firstLine.Contains("RAS") && !firstLine.StartsWith("-")))
+                {
+                    vm.ErrorMessage = "Invalid file format. Only BGL and HDFS logs are supported.";
+                    return View(vm);
+                }
+            }
+
             // 1. Upload
             var uploadResp = await _api.UploadFileAsync(logFile);
             if (uploadResp == null)
@@ -62,7 +76,7 @@ namespace LogNomaly.Web.Controllers
                 return View(vm);
             }
 
-            // 2. Analiz
+            // 2. Analyze
             var analyzeResp = await _api.AnalyzeFileAsync(uploadResp.FilePath, uploadResp.SessionId);
             if (analyzeResp == null)
             {
@@ -70,7 +84,7 @@ namespace LogNomaly.Web.Controllers
                 return View(vm);
             }
 
-            // Session'a kaydet
+            // Save to session
             HttpContext.Session.SetString("SessionId", uploadResp.SessionId);
 
             vm.SessionId = uploadResp.SessionId;
@@ -80,7 +94,7 @@ namespace LogNomaly.Web.Controllers
             return View(vm);
         }
 
-        // ── Tek Satır Analiz ─────────────────────────────────────────────
+        // ── Single Line Analyze ─────────────────────────────────────────────
         public IActionResult SingleAnalyze()
         {
             return View(new SingleAnalyzeViewModel());
@@ -96,6 +110,11 @@ namespace LogNomaly.Web.Controllers
                 vm.ErrorMessage = "Log Line cannot be null.";
                 return View(vm);
             }
+            if (!logLine.Contains("blk_") && !logLine.Contains("RAS") && !logLine.StartsWith("-"))
+            {
+                vm.ErrorMessage = "Invalid file format. Only BGL and HDFS logs are supported.";
+                return View(vm);
+            }
 
             var result = await _api.AnalyzeSingleAsync(logLine);
             if (result == null)
@@ -108,7 +127,7 @@ namespace LogNomaly.Web.Controllers
             return View(vm);
         }
 
-        // ── XAI Detay ────────────────────────────────────────────────────
+        // ── XAI Detail ────────────────────────────────────────────────────
         public async Task<IActionResult> Xai(string sessionId, int index)
         {
             var results = await _api.GetResultsAsync(sessionId, 1, 1000);
@@ -140,7 +159,7 @@ namespace LogNomaly.Web.Controllers
             return View(vm);
         }
 
-        // ── API Health Check (AJAX için) ─────────────────────────────────
+        // ── API Health Check (AJAX) ─────────────────────────────────
         [HttpGet]
         public async Task<IActionResult> ApiHealth()
         {

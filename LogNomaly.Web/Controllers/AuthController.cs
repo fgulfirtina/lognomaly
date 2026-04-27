@@ -3,6 +3,7 @@ using LogNomaly.Web.Utilities;
 using LogNomaly.Web.ViewModels;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
@@ -76,6 +77,11 @@ namespace LogNomaly.Web.Controllers
 
                 _logger.LogInformation($"Analyst {analyst.Username} logged in successfully.");
 
+                if(analyst.Role == "Admin")
+                {
+                    return RedirectToAction("Index", "Admin");
+                }
+
                 return RedirectToAction("Index", "Home");
             }
             catch (Exception ex)
@@ -94,7 +100,15 @@ namespace LogNomaly.Web.Controllers
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             _logger.LogInformation($"Analyst {username} logged out.");
 
+            HttpContext.Session.Clear();
+
             return RedirectToAction("Login");
+        }
+
+        [AllowAnonymous]
+        public IActionResult AccessDenied()
+        {
+            return View();
         }
     }
 }

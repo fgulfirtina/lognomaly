@@ -20,14 +20,14 @@ namespace LogNomaly.Web.Data
                 // Check if any analysts exist in the database
                 if (!await context.Analysts.AnyAsync())
                 {
-                    logger.LogInformation("No analysts found. Seeding the initial Senior Analyst account...");
+                    logger.LogInformation("No analysts found. Seeding the initial Admin account...");
 
                     var adminAnalyst = new Analyst
                     {
-                        Username = "Fatmagul",
+                        Username = "SystemAdmin",
                         // The password is now securely hashed before being saved
                         PasswordHash = PasswordHasher.HashPassword("Admin123!"),
-                        Role = "Senior",
+                        Role = "Admin",
                         CreatedAt = DateTime.UtcNow
                     };
 

@@ -79,67 +79,100 @@
         }
     </div>
 
-    <div class="card">
-        <div class="card-header">
-            <div class="card-title">
-                🧠 Model Retraining Queue (False Positives)
-                <span style="background:var(--bg-page); border:1px solid var(--border); color:var(--text-muted); padding:2px 8px; border-radius:12px; font-size:11px; margin-left:8px;">
-                    @Model.PendingFalsePositives.Count Pending
-                </span>
-            </div>
-            <div class="card-subtitle">Approve these logs to augment the training dataset.</div>
+    <div class="investigation-card" style="margin-top: 30px; background: var(--bg-surface, #ffffff); border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid var(--border, #eaeaea); padding: 20px;">
+
+        <div style="margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+            <h3 style="margin: 0; font-size: 1.2rem; color: var(--text-primary);">📋 Pending Corrections Queue</h3>
+            <span style="background: var(--warn, #ffc107); color: #000; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: bold;">@Model.PendingCorrections.Count() Cases</span>
         </div>
 
-        @if (Model.PendingFalsePositives.Any())
-        {
-            <div style="overflow-x: auto;">
-                <table class="log-table">
-                    <thead>
-                        <tr>
-                            <th>Log ID</th>
-                            <th>AI Prediction</th>
-                            <th>Reported By</th>
-                            <th>Timestamp</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var fp in Model.PendingFalsePositives)
+        <div class="table-responsive">
+            <table class="clean-table" style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="border-bottom: 2px solid var(--border, #eaeaea); color: var(--text-muted, #888); font-size: 0.75rem; letter-spacing: 1px; text-transform: uppercase; text-align: left;">
+                        <th style="padding: 12px 8px;">Log ID</th>
+                        <th style="padding: 12px 8px;">Time</th>
+                        <th style="padding: 12px 8px;">Analyst</th>
+                        <th style="padding: 12px 8px;">Correction Type</th>
+                        <th style="padding: 12px 8px;">Label Transition</th>
+                        <th style="padding: 12px 8px; text-align: right;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model.PendingCorrections)
+                    {
+                        // Determine the type
+                        string badgeText = "Review";
+                        string badgeStyle = "background-color: var(--text-muted); color: white;";
+
+                        string aiLabel = string.IsNullOrEmpty(item.PredictedClass) ? "Unknown" : item.PredictedClass;
+                        string userLabel = string.IsNullOrEmpty(item.ProposedLabel) ? "Unknown" : item.ProposedLabel;
+
+                        // 1. FP Check
+                        if (item.ActionType == "FalsePositive" || userLabel == "Normal")
                         {
-                            <tr>
-                                <td style="font-family:var(--font-mono); font-weight:500;">
-                                    <a href="/SocManager/Review/@fp.Id" 
-                                       style="color:var(--accent-dark); font-weight:500; text-decoration:none; border-bottom:1px dashed var(--accent-dark); transition:opacity 0.2s;" 
-                                       onmouseover="this.style.opacity='0.7'" 
-                                       onmouseout="this.style.opacity='1'">
-                                        @fp.LogId
-                                    </a>
-                                </td>
-                                <td><span style="color:var(--danger); font-size:12px;">@fp.PredictedClass</span> → <span style="color:var(--ok); font-size:12px; font-weight:500;">Normal</span></td>
-                                <td style="font-size:12px;">@fp.Analyst?.Username</td>
-                                <td style="font-size:12px; color:var(--text-muted);">@fp.CreatedAt.ToString("MMM dd, HH:mm")</td>
-                                <td>
-                                    <div style="display:flex; gap:6px;">
-                                        <button class="btn btn-outline btn-sm" style="color:var(--ok); border-color:var(--ok);" onclick="processFeedback(@fp.Id, 'Approve')">Approve</button>
-                                        <button class="btn btn-outline btn-sm" style="color:var(--danger); border-color:var(--danger);" onclick="processFeedback(@fp.Id, 'Reject')">Reject</button>
-                                    </div>
-                                </td>
-                            </tr>
+                            userLabel = "Normal";
+                            badgeText = "FP Claim";
+                            badgeStyle = "background-color: var(--ok, #28a745); color: white;";
                         }
-                    </tbody>
-                </table>
-            </div>
-        }
-        else
+                        // 2. FN Check
+                        else if (aiLabel == "Normal" && userLabel != "Normal" && userLabel != "Unknown")
+                        {
+                            badgeText = "FN Claim";
+                            badgeStyle = "background-color: var(--danger, #dc3545); color: white;";
+                        }
+                        // 3. Misclass Check
+                        else if (aiLabel != "Normal" && userLabel != "Normal" && aiLabel != userLabel)
+                        {
+                            badgeText = "Misclass";
+                            badgeStyle = "background-color: var(--warn, #ffc107); color: black;";
+                        }
+                        // ---------------------------------------------------
+
+                        <tr style="border-bottom: 1px solid var(--border, #eaeaea); transition: background 0.2s;">
+                            <td style="padding: 16px 8px; font-family: monospace; color: var(--text-muted);">@item.LogId.Substring(0, Math.Min(8, item.LogId.Length))</td>
+                            <td style="padding: 16px 8px; font-size: 0.9em;">@item.CreatedAt.ToString("MMM dd, HH:mm")</td>
+
+                            <td style="padding: 16px 8px;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <div style="width: 24px; height: 24px; border-radius: 50%; background: #eee; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: bold; color: #555;">
+                                        @(item.Analyst?.Username?.Substring(0, 1).ToUpper() ?? "U")
+                                    </div>
+                                    <span>@item.Analyst?.Username</span>
+                                </div>
+                            </td>
+
+                            <td style="padding: 16px 8px;">
+                                <span style="padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.8rem; @badgeStyle">
+                                    @badgeText
+                                </span>
+                            </td>
+
+                            <td style="padding: 16px 8px; font-size: 0.9em;">
+                                <span style="color: var(--text-muted);">@aiLabel</span>
+                                <strong style="margin: 0 5px; color: var(--text-muted);">➔</strong>
+                                <span style="font-weight: 600; color: var(--text-primary);">@userLabel</span>
+                            </td>
+
+                            <td style="padding: 16px 8px; text-align: right;">
+                                <a href="/SocManager/Review/@item.Id" style="display: inline-block; padding: 6px 14px; border: 1px solid var(--border, #ccc); border-radius: 6px; color: var(--text-primary); text-decoration: none; font-size: 0.85rem; background: transparent; transition: all 0.2s;" onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='transparent'">
+                                    Review Case
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (!Model.PendingCorrections.Any())
         {
-            <div class="empty-state">
-                <div class="empty-icon">✨</div>
-                <div style="font-weight:500;">No pending false positives</div>
-                <div style="font-size:12px; color:var(--text-dim);">The AI model is currently aligned.</div>
+            <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+                <i class="icon-check" style="font-size: 2rem;"></i>
+                <p>No pending corrections. The queue is clear!</p>
             </div>
         }
     </div>
-
 </div>
 
 <dialog id="logDetailsModal" style="width: 650px; max-width: 90vw; padding: 0; border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); margin: auto; background: var(--bg-card); color: var(--text-primary);">
@@ -201,10 +234,10 @@
                 alert("Could not connect to the server.");
             }
         }
-        // Modal'ı açan ve verileri içine basan fonksiyon
+
+        // Opens the modal
         function openLogModal(title, rawLog) {
             document.getElementById('modalTitle').innerText = title;
-            // Log boşsa "No payload data" yaz, değilse logu bas
             document.getElementById('modalRawLog').innerText = rawLog || "No raw payload data available for this event.";
             document.getElementById('logDetailsModal').showModal();
         }

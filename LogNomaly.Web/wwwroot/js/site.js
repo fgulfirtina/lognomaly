@@ -1,6 +1,6 @@
 // LogNomaly — Frontend JS
 
-// API sağlık kontrolü
+// API health check
 (function checkApiHealth() {
     fetch('/Home/ApiHealth')
         .then(r => r.json())
@@ -10,10 +10,10 @@
             if (!dot || !text) return;
             if (data && data.models_loaded) {
                 dot.className  = 'status-dot ok';
-                text.textContent = 'API · Modeller Hazır';
+                text.textContent = 'API · Models are ready';
             } else {
                 dot.className  = 'status-dot error';
-                text.textContent = 'API · Model Yüklenmedi';
+                text.textContent = 'API · Could not load the Model';
             }
         })
         .catch(() => {
@@ -21,6 +21,6 @@
             var text = document.querySelector('.status-text');
             if (!dot || !text) return;
             dot.className  = 'status-dot error';
-            text.textContent = 'API · Bağlanamıyor';
+            text.textContent = 'API · Connection failed';
         });
 })();

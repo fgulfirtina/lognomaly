@@ -17,7 +17,7 @@ namespace LogNomaly.Web.Data
         {
             base.OnModelCreating(modelBuilder);
 
-            // Vakalar ile Analistler arasındaki ilişkiyi belirtiyoruz (Cascade silinmeyi önlemek için)
+            // Determine the realtion between cases and analysts
             modelBuilder.Entity<InvestigationCase>()
                 .HasOne(c => c.AssignedAnalyst)
                 .WithMany(a => a.AssignedCases)

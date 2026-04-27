@@ -1,0 +1,68 @@
+﻿@{
+    ViewData["Title"] = "Access Denied";
+    Layout = "_Layout"; 
+}
+
+<div class="access-denied-container">
+    <div class="glitch-wrapper">
+        <h1 class="glitch" data-text="403">403</h1>
+    </div>
+    <h2>ACCESS RESTRICTED</h2>
+    <p>Your current clearance level (<strong>@User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value</strong>) is not authorized to view this sector.</p>
+
+    <div class="terminal-box">
+        <p>> Security violation logged.</p>
+        <p>> IP Address flagged for review.</p>
+        <p class="blinking-cursor">> _</p>
+    </div>
+
+    <a href="/Home/Index" class="btn-primary" style="margin-top: 20px;">Return to Dashboard</a>
+</div>
+
+<style>
+
+    .access-denied-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 70vh;
+        text-align: center;
+        color: var(--text-primary, #fff);
+    }
+
+    .glitch {
+        font-size: 6rem;
+        font-weight: bold;
+        color: var(--danger, #ff4c4c);
+        margin: 0;
+        text-shadow: 2px 2px 0px #00ffff, -2px -2px 0px #ff00ff;
+    }
+
+    .access-denied-container h2 {
+        letter-spacing: 2px;
+        margin-bottom: 10px;
+    }
+
+    .terminal-box {
+        margin-top: 30px;
+        background-color: #0a0a0a;
+        border: 1px solid #333;
+        border-left: 3px solid var(--danger, #ff4c4c);
+        padding: 15px 30px;
+        text-align: left;
+        font-family: 'Courier New', Courier, monospace;
+        color: #00ff00;
+        border-radius: 4px;
+    }
+
+    .blinking-cursor {
+        animation: blink 1s step-end infinite;
+    }
+
+    @@keyframes blink {
+        50% {
+            opacity: 0;
+        }
+    }
+</style>

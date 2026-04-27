@@ -32,7 +32,7 @@ namespace LogNomaly.Web.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Health check hatasi");
+                _logger.LogError(ex, "Health check error");
                 return null;
             }
         }
@@ -48,14 +48,14 @@ namespace LogNomaly.Web.Services
                 var resp = await _http.PostAsync("/api/upload", form);
                 if (!resp.IsSuccessStatusCode)
                 {
-                    _logger.LogWarning("Upload basarisiz: {Status}", resp.StatusCode);
+                    _logger.LogWarning("Upload failed: {Status}", resp.StatusCode);
                     return null;
                 }
                 return await resp.Content.ReadFromJsonAsync<UploadResponse>(_json);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Dosya yukleme hatasi");
+                _logger.LogError(ex, "File upload error");
                 return null;
             }
         }
@@ -70,14 +70,14 @@ namespace LogNomaly.Web.Services
                 var resp = await _http.PostAsync("/api/analyze", content);
                 if (!resp.IsSuccessStatusCode)
                 {
-                    _logger.LogWarning("Analiz basarisiz: {Status}", resp.StatusCode);
+                    _logger.LogWarning("Analysis failed: {Status}", resp.StatusCode);
                     return null;
                 }
                 return await resp.Content.ReadFromJsonAsync<AnalyzeResponse>(_json);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Dosya analiz hatasi");
+                _logger.LogError(ex, "File analyze error");
                 return null;
             }
         }
@@ -95,7 +95,7 @@ namespace LogNomaly.Web.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Tek satir analiz hatasi");
+                _logger.LogError(ex, "Single line analyze error");
                 return null;
             }
         }
@@ -109,7 +109,7 @@ namespace LogNomaly.Web.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Stats hatasi");
+                _logger.LogError(ex, "Stats error");
                 return null;
             }
         }
@@ -124,7 +124,7 @@ namespace LogNomaly.Web.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Results hatasi");
+                _logger.LogError(ex, "Results error");
                 return null;
             }
         }

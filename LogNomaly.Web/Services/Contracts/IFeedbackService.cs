@@ -4,7 +4,8 @@ namespace LogNomaly.Web.Services.Contracts
 {
     public interface IFeedbackService
     {
-        // Geri bildirimi kaydeder, başarılıysa true döner
+        // Submits the feedback
         Task<bool> SubmitFeedbackAsync(FeedbackDto request, int analystId);
+        Task<RetrainResponseDto> TriggerRetrainAsync();
     }
 }

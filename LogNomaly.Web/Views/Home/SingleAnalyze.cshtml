@@ -123,7 +123,6 @@
             <div class="card">
                 <div class="card-title">Why is this Risky? (SHAP)</div>
                 <div style="margin-top:15px;">
-                    @* +++ BURADAKİ NULL HATASI DÜZELTİLDİ +++ *@
                     @if (r.ShapExplanation != null && r.ShapExplanation.TopFeatures != null && r.ShapExplanation.TopFeatures.Any())
                     {
                         @foreach (var feat in r.ShapExplanation.TopFeatures)
@@ -149,11 +148,67 @@
         </div>
 
         <div class="card" style="margin-top:24px; display:flex; justify-content:center; align-items:center; gap:16px; background:var(--bg-page);">
-            <button class="btn btn-outline" onclick="flagFalsePositive()" style="border-radius:20px; background:white;">Flag as False Positive</button>
+            <button class="btn btn-warning" onclick="openCorrectionModal()" style="border-radius:20px; padding:10px 20px; font-weight:bold; background:#f59e0b; color:white; border:none;">⚠ Report Incorrect Prediction</button>
             <button class="btn btn-primary" onclick="startInvestigation()" style="border-radius:20px; padding:10px 30px;">🔍 Start Investigation</button>
         </div>
     </div>
 }
+
+<dialog id="correctionModal" class="native-modal">
+    <form method="dialog" id="correctionForm">
+        <h3>⚠ Report Incorrect Prediction</h3>
+
+        <div class="readonly-banner" style="background: #f1f5f9; padding: 10px; border-radius: 6px; margin-bottom: 15px;">
+            <small style="color:var(--text-muted)">Current AI Prediction:</small>
+            <strong id="modalCurrentAiPred" style="color:var(--danger); display:block; font-size:16px;">@(Model.Result?.PredictedClass ?? "Unknown")</strong>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 15px;">
+            <label for="proposedLabel" style="display:block; margin-bottom:5px; font-size:13px; font-weight:bold;">Proposed Correct Label:</label>
+
+            <select id="proposedLabel" style="width:100%; padding:8px; border-radius:4px; border:1px solid var(--border);" required onchange="updateDynamicHint()">
+                <option value="">-- Select Label --</option>
+
+                @if (ViewBag.DynamicLabels != null)
+                {
+                    foreach (var label in ViewBag.DynamicLabels)
+                    {
+                        <option value="@label">@label</option>
+                    }
+                }
+                else
+                {
+                    <option value="Normal">Normal</option>
+                    <option value="BruteForce">BruteForce</option>
+                    <option value="SQLInjection">SQLInjection</option>
+                    <option value="DDoS">DDoS</option>
+                    <option value="SystemFailure">SystemFailure</option>
+                    <option value="TemporalAnomaly">TemporalAnomaly</option>
+                    <option value="UnknownAnomaly">UnknownAnomaly</option>
+                }
+
+                <option disabled>──────────</option>
+                <option value="OTHER">➕ Other (Custom Threat)...</option>
+            </select>
+
+            <input type="text" id="customLabelInput" class="form-control"
+                   style="display:none; margin-top: 10px; width:100%; padding:8px; border-radius:4px; border:1px dashed var(--warn); background-color: #fffdf5;"
+                   placeholder="Type exact threat name (e.g., CryptoMining)..." />
+
+            <small id="dynamicHint" style="display:block; margin-top:5px; font-weight:bold;"></small>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 15px;">
+            <label for="analystNotes" style="display:block; margin-bottom:5px; font-size:13px; font-weight:bold;">Justification (Min 10 chars):</label>
+            <textarea id="analystNotes" minlength="10" required placeholder="Explain why the AI is wrong..." style="width:100%; padding:8px; border-radius:4px; border:1px solid var(--border); min-height:80px;"></textarea>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+            <button type="button" class="btn btn-outline" onclick="document.getElementById('correctionModal').close()">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="submitCorrection()">Submit Correction</button>
+        </div>
+    </form>
+</dialog>
 
 @section Scripts {
     <script>
@@ -172,10 +227,23 @@
             });
         }
 
-        async function sendActionToBackend(actionType, notes = "") {
-            var shortId = Model.SessionId?.Substring(0, Math.Min(Model.SessionId.Length, 8)) ?? "Unknown";
+        function startInvestigation() {
+            const notes = prompt("Investigation starts. You may add your notes (Optional):");
+
+            if(confirm("Are you sure to start an official case for this log?")) {
+                if (notes !== null) {
+                sendActionToBackend("Investigate", notes);
+                }
+                else{
+                    sendActionToBackend("Investigate");
+                }
+            }
+        }
+
+        async function sendActionToBackend(actionType, notes = "", proposedLabel = null) {
+            var shortId = '@(Model.SessionId)' ? '@(Model.SessionId)'.substring(0, 8) : "Unknown";
             const logId = shortId;
-            const rawLog = document.getElementById('rawLog') ? document.getElementById('rawLog').innerText.trim() : "Log bulunamadı";
+            const rawLog = document.getElementById('rawLog') ? document.getElementById('rawLog').innerText.trim() : "Log not found";
             const predictedClass = "@(Model.Result?.PredictedClass ?? "Unknown")";
             const riskLevel = "@(Model.Result?.RiskLevel ?? "Low")";
 
@@ -185,7 +253,8 @@
                 PredictedClass: predictedClass,
                 RiskLevel: riskLevel,
                 ActionType: actionType,
-                AnalystNotes: notes
+                AnalystNotes: notes,
+                ProposedLabel: proposedLabel
             };
 
             try {
@@ -199,43 +268,88 @@
 
                 if (data.success) {
                     if (actionType === 'Investigate') {
-                        alert("✅ Vaka başarıyla oluşturuldu! Log, Analist paneline atandı.");
+                        alert("✅ Case created successfully! Log, is assigned to Analyst panel.");
                     } else {
-                        alert("✅ Log 'False Positive' olarak işaretlendi. Model eğitimi için karantinaya alındı!");
+                        alert("✅ Log correction is sent to SOC Manager for approval. If approved, model will be retrained!");
+                        document.getElementById('correctionModal').close();
                     }
                 } else {
-                    alert("❌ İşlem başarısız: " + data.message);
+                    alert("❌ Failed: " + data.message);
                 }
             } catch (error) {
-                console.error("API Bağlantı Hatası:", error);
-                alert("Sunucuya ulaşılamadı. Lütfen konsolu kontrol edin.");
+                console.error("API Connection Error:", error);
+                alert("Failed to connect to the server. Please check the console.");
             }
         }
 
-        function startInvestigation() {
-            const notes = prompt("Vaka (Investigation) başlatılıyor. Varsa ön notlarınızı girebilirsiniz (Opsiyonel):");
-            if (notes !== null) {
-                sendActionToBackend("Investigate", notes);
+        function openCorrectionModal() {
+            document.getElementById('correctionModal').showModal();
+        }
+
+        // Hint and custom label
+        function updateDynamicHint() {
+            const aiPred = "@(Model.Result?.PredictedClass ?? "Unknown")";
+            const selectValue = document.getElementById('proposedLabel').value;
+            const customInput = document.getElementById('customLabelInput');
+            const hintEl = document.getElementById('dynamicHint');
+
+            if (selectValue === "OTHER") {
+                customInput.style.display = "block";
+                customInput.focus();
+            } else {
+                customInput.style.display = "none";
+                customInput.value = "";
             }
-            if(confirm("Bu log için resmi bir inceleme (vaka) başlatmak istediğinize emin misiniz?")) {
-                sendActionToBackend("Investigate");
+
+            if (!selectValue) { hintEl.innerText = ""; return; }
+
+            const isAiThreat = aiPred !== "Normal";
+            const isNewThreat = selectValue !== "Normal";
+
+            if (isAiThreat && !isNewThreat) {
+                hintEl.innerText = "💡 This will be logged as a False Positive.";
+                hintEl.style.color = "var(--ok, green)";
+            } else if (!isAiThreat && isNewThreat) {
+                hintEl.innerText = "🚨 This will be logged as a False Negative!";
+                hintEl.style.color = "var(--danger, red)";
+            } else {
+                hintEl.innerText = "🔄 This will be logged as a Misclassification.";
+                hintEl.style.color = "var(--warn, orange)";
+            }
+
+            if (selectValue === "OTHER") {
+                hintEl.innerText += " (Defining a custom threat class)";
             }
         }
 
-        function flagFalsePositive() {
-            const reason = prompt("Lütfen bu olayın neden 'False Positive' (Yanlış Alarm) olduğunu açıklayın (Zorunlu):");
+        function submitCorrection() {
+            let proposed = document.getElementById('proposedLabel').value;
+            const notes = document.getElementById('analystNotes').value;
+            const customInput = document.getElementById('customLabelInput').value.trim();
 
-            if (reason === null) {
-                return; // Kullanıcı Cancel/İptal tuşuna bastı
-            }
-
-            if (reason.trim() === "") {
-                alert("❌ İşlem reddedildi: False Positive bildirimi için geçerli bir gerekçe yazmak zorundasınız.");
+            if (!proposed) {
+                alert("Please select a proposed label.");
                 return;
             }
 
-            if(confirm("Bu log'u için False Positive olarak işaretlemek istediğinize emin misiniz?")) {
-                sendActionToBackend("FalsePositive", reason);
+            if (proposed === "OTHER") {
+                if (!customInput) {
+                    alert("Please type the name of the custom threat.");
+                    document.getElementById('customLabelInput').focus();
+                    return;
+                }
+                proposed = customInput;
             }
+
+            if (!notes || notes.trim().length < 10) {
+                alert("Please provide a justification (minimum 10 characters).");
+                return;
+            }
+
+            if(confirm("Are you sure you want to submit this correction for model retraining?")) {
+                sendActionToBackend("Correction", notes, proposed);
+            }
+        }
+
     </script>
 }

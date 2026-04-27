@@ -7,7 +7,7 @@ namespace LogNomaly.Web.ViewModels
         // Active investigations assigned to analysts
         public List<InvestigationCase> ActiveCases { get; set; } = new List<InvestigationCase>();
 
-        // False positive flags waiting for Senior approval
-        public List<AnalystFeedback> PendingFalsePositives { get; set; } = new List<AnalystFeedback>();
+        // Correction flags waiting for Senior approval
+        public List<AnalystFeedback> PendingCorrections { get; set; } = new List<AnalystFeedback>();
     }
 }

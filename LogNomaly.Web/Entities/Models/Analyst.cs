@@ -13,13 +13,13 @@ namespace LogNomaly.Web.Entities.Models
         [Required]
         public string PasswordHash { get; set; } = string.Empty;
 
-        // "Junior" veya "Senior"
+        // "Junior" or "Senior"
         [Required, MaxLength(20)]
         public string Role { get; set; } = "Junior";
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-        // Navigation Properties (Bir analistin birden çok geri bildirimi ve vakası olabilir)
+        // Navigation Properties
         public ICollection<AnalystFeedback> Feedbacks { get; set; } = new List<AnalystFeedback>();
         public ICollection<InvestigationCase> AssignedCases { get; set; } = new List<InvestigationCase>();
     }

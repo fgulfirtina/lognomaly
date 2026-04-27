@@ -1,5 +1,5 @@
 ﻿<!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -9,28 +9,37 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
 <body>
+    <div class="mobile-topbar">
+        <button id="hamburger-btn" aria-label="Menu" style="background: none; border: none; font-size: 24px; color: var(--text-primary); cursor: pointer;">☰</button>
+        <span class="mobile-logo" style="font-weight: 600; font-size: 18px;">LogNomaly SOC</span>
+    </div>
+
     <div class="app-shell">
-        <nav class="sidebar">
+        <nav class="sidebar" id="sidebar">
             <div class="sidebar-logo">
                 <div class="logo-icon">L</div>
                 <span class="logo-text">LogNomaly</span>
             </div>
             <ul class="nav-links">
-                <li>
-                    <a href="/" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "Index" ? "active" : "")">
-                        <span class="nav-icon">+</span> Dashboard
-                    </a>
-                </li>
-                <li>
-                    <a href="/Home/Analyze" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "Analyze" ? "active" : "")">
-                        <span class="nav-icon">=</span> Log Analysis
-                    </a>
-                </li>
-                <li>
-                    <a href="/Home/SingleAnalyze" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "SingleAnalyze" ? "active" : "")">
-                        <span class="nav-icon">o</span> Single Line Analysis
-                    </a>
-                </li>
+                @if (User.IsInRole("Senior") || User.IsInRole("Junior"))
+                {
+                    <li>
+                        <a href="/" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "Index" ? "active" : "")">
+                            <span class="nav-icon">+</span> Dashboard
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/Home/Analyze" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "Analyze" ? "active" : "")">
+                            <span class="nav-icon">=</span> Log Analysis
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/Home/SingleAnalyze" class="@(ViewContext.RouteData.Values["action"]?.ToString() == "SingleAnalyze" ? "active" : "")">
+                            <span class="nav-icon">o</span> Single Line Analysis
+                        </a>
+                    </li>
+                }
+                
                 @if (User.IsInRole("Senior"))
                 {
                     <li style="margin-top: 15px; margin-bottom: 10px;">
@@ -42,6 +51,19 @@
                         </a>
                     </li>
                 }
+
+                @if (User.IsInRole("Admin"))
+                {
+                    <li style="margin-top: 15px; margin-bottom: 10px;">
+                        <div style="font-size: 10px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; padding-left: 12px;">Administration</div>
+                    </li>
+                    <li>
+                        <a href="/Admin/Index" class="@(ViewContext.RouteData.Values["controller"]?.ToString() == "Admin" ? "active" : "")">
+                            <span class="nav-icon">⚙️</span> Admin Panel
+                        </a>
+                    </li>
+                }
+
                 <li style="margin-top: 20px; padding-top: 10px; border-top: 0.5px solid var(--border);">
                     <form asp-controller="Auth" asp-action="Logout" method="post" style="margin: 0; padding: 0;">
                         <button type="submit" style="display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 12px; border-radius: var(--radius-sm); color: var(--danger); background: transparent; border: none; cursor: pointer; font-family: var(--font-sans); font-size: 13px; font-weight: 500; text-align: left; transition: all 0.15s;">
@@ -61,6 +83,17 @@
             </div>
         </main>
     </div>
+
+    <script>
+        const hamburgerBtn = document.getElementById('hamburger-btn');
+        if (hamburgerBtn) {
+            hamburgerBtn.addEventListener('click', function () {
+                document.getElementById('sidebar').classList.toggle('open');
+            });
+        }
+    </script>
+
+    </script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>

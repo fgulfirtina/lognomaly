@@ -24,7 +24,7 @@ namespace LogNomaly.Web.Controllers
             if (request == null || string.IsNullOrEmpty(request.LogId))
             {
                 _logger.LogWarning("Submit endpoint called with invalid or empty request.");
-                return BadRequest(new { success = false, message = "Geçersiz veya eksik veri gönderildi." });
+                return BadRequest(new { success = false, message = "Data is invalid or missing." });
             }
 
             try
@@ -41,17 +41,17 @@ namespace LogNomaly.Web.Controllers
 
                 if (isSuccess)
                 {
-                    return Ok(new { success = true, message = "Aksiyon başarıyla veritabanına işlendi." });
+                    return Ok(new { success = true, message = "Action successfully processed into the database." });
                 }
                 else
                 {
-                    return StatusCode(500, new { success = false, message = "Kayıt işlemi başarısız oldu." });
+                    return StatusCode(500, new { success = false, message = "Submit failed." });
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "System error in FeedbackController Submit action.");
-                return StatusCode(500, new { success = false, message = "Sistem Hatası oluştu." });
+                return StatusCode(500, new { success = false, message = "A system error occured." });
             }
         }
     }

@@ -1,10 +1,12 @@
 ﻿using LogNomaly.Web.Data;
+using LogNomaly.Web.Entities.DTOs;
 using LogNomaly.Web.Entities.Models;
 using LogNomaly.Web.Services.Contracts;
 using LogNomaly.Web.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace LogNomaly.Web.Controllers
 {
@@ -26,20 +28,26 @@ namespace LogNomaly.Web.Controllers
         [HttpGet]
         public async Task<IActionResult> Index()
         {
+            var currentUserIdStr = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+            int.TryParse(currentUserIdStr, out int currentUserId);
+
             var viewModel = new SocManagerViewModel
             {
                 // Fetch cases with their assigned analysts and the original feedback/log
                 ActiveCases = await _context.InvestigationCases
                 .Include(c => c.AssignedAnalyst)
                 .Include(c => c.Feedback)
+                .Where(c => c.AssignedAnalystId == null || c.AssignedAnalystId == currentUserId)
                 .Where(c => c.Status != "Resolved" && c.Status != "Closed")
                 .OrderByDescending(c => c.OpenedAt)
                 .ToListAsync(),
 
                 // Fetch only pending false positives that need model retraining approval
-                PendingFalsePositives = await _context.AnalystFeedbacks
+                PendingCorrections = await _context.AnalystFeedbacks
                     .Include(f => f.Analyst)
-                    .Where(f => f.ActionType == "FalsePositive" && f.Status == "Pending")
+                    .Where(f => f.Status == "Pending" &&
+                              (f.ActionType == "FalsePositive" ||
+                               f.ActionType == "Correction"))
                     .OrderByDescending(f => f.CreatedAt)
                     .ToListAsync()
             };
@@ -107,14 +115,19 @@ namespace LogNomaly.Web.Controllers
             if (feedback == null)
                 return NotFound();
 
-            // Logu tekrar Python yapay zekasına gönderip detaylı analiz (SHAP vb.) alıyoruz
+            var invCase = await _context.InvestigationCases
+            .Include(c => c.AssignedAnalyst)
+            .FirstOrDefaultAsync(c => c.FeedbackId == id);
+
+            // Log is sent to AI and detailed analyze is requested
             var aiAnalysisResult = await _pythonApiService.AnalyzeSingleAsync(feedback.RawLog);
 
-            // Hem veritabanı kaydını hem de yapay zeka sonucunu View'a gönderiyoruz
+            // Both database record and AI answer are sent to View
             var viewModel = new CaseReportViewModel
             {
                 FeedbackRecord = feedback,
-                AiInsight = aiAnalysisResult
+                AiInsight = aiAnalysisResult,
+                InvestigationRecord = invCase
             };
 
             return View(viewModel);
@@ -125,19 +138,19 @@ namespace LogNomaly.Web.Controllers
         {
             try
             {
-                // 1. Investigation Case tablosundan ilgili vakayı bul
+                // 1. Find the corresponding Investigation Case
                 var invCase = await _context.InvestigationCases
                     .FirstOrDefaultAsync(c => c.FeedbackId == request.FeedbackId);
 
                 if (invCase == null)
                     return NotFound(new { success = false, message = "Investigation case not found." });
 
-                // 2. Statüyü güncelle ve çözülme tarihini at
+                // 2. Update the status
                 invCase.Status = "Resolved";
                 invCase.ClosedAt = DateTime.UtcNow;
                 invCase.ResolutionNotes = request.Notes;
 
-                // 3. İlgili Feedback kaydının da statüsünü güncelle
+                // 3. Update related feedback status
                 var feedback = await _context.AnalystFeedbacks.FindAsync(request.FeedbackId);
                 if (feedback != null) feedback.Status = "Resolved";
 
@@ -160,7 +173,7 @@ namespace LogNomaly.Web.Controllers
                 var feedback = await _context.AnalystFeedbacks.FindAsync(request.FeedbackId);
                 if (feedback == null) return NotFound(new { success = false, message = "Case not found." });
 
-                // Mevcut notların sonuna tarih atarak yeni notu ekliyoruz
+                // Add new notes
                 string timeStamp = DateTime.UtcNow.ToString("dd MMM HH:mm");
                 feedback.AnalystNotes += $"\n\n[{timeStamp} - Update]: {request.Notes}";
 
@@ -171,6 +184,68 @@ namespace LogNomaly.Web.Controllers
             {
                 return StatusCode(500, new { success = false, message = "Database error." });
             }
+        }
+
+        // ── POST /SocManager/SubmitCorrection ────────────────────────────
+        // Called by the "Report Incorrect Prediction" modal in Review.cshtml
+        [HttpPost]
+        public async Task<IActionResult> SubmitCorrection([FromBody] SubmitCorrectionDto dto)
+        {
+            // Resolve the current analyst's ID from the auth cookie/claims
+            var analystIdClaim = User.FindFirst("AnalystId")?.Value
+                              ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (!int.TryParse(analystIdClaim, out int analystId))
+                return Json(new { success = false, message = "Could not identify the current analyst." });
+
+            // Fetch the existing feedback record to copy its raw log / predicted class
+            var existing = await _context.AnalystFeedbacks.FindAsync(dto.FeedbackId);
+            if (existing == null)
+                return Json(new { success = false, message = "Feedback record not found." });
+
+            // Validate the proposed label is an accepted value
+            var allowedLabels = new[] {
+            "Normal", "BruteForce", "SQLInjection", "DDoS",
+            "SystemFailure", "AppError", "HardwareFailure", "UnknownAnomaly"
+            };
+            if (!allowedLabels.Contains(dto.ProposedLabel))
+                return Json(new { success = false, message = "Invalid proposed label." });
+
+            // Update the existing record rather than creating a duplicate
+            existing.ProposedLabel = dto.ProposedLabel;
+            existing.AnalystNotes = dto.AnalystNotes;
+            existing.ActionType = "Correction";
+            existing.Status = "Pending";   // resets to pending for senior review
+
+            try
+            {
+                await _context.SaveChangesAsync();
+                _logger.LogInformation(
+                    "Correction submitted: FeedbackId={Id} ProposedLabel={Label} by Analyst={AnalystId}",
+                    dto.FeedbackId, dto.ProposedLabel, analystId);
+                return Json(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error saving correction for FeedbackId: {Id}", dto.FeedbackId);
+                return Json(new { success = false, message = "Database error while saving correction." });
+            }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ClaimCase([FromForm] int caseId)
+        {
+            var currentUserIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(currentUserIdStr, out int currentUserId)) return Unauthorized();
+
+            var invCase = await _context.InvestigationCases.FindAsync(caseId);
+            if (invCase == null) return NotFound();
+
+            // Assign the case to the senior
+            invCase.AssignedAnalystId = currentUserId;
+            await _context.SaveChangesAsync();
+
+            return RedirectToAction(nameof(Index));
         }
     }
 }

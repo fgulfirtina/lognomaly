@@ -3,6 +3,7 @@ using System;
 using LogNomaly.Web.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace LogNomaly.Web.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260424212839_AddAdminAndCorrections")]
+    partial class AddAdminAndCorrections
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -122,7 +125,7 @@ namespace LogNomaly.Web.Migrations
                     b.Property<string>("AnalystNotes")
                         .HasColumnType("text");
 
-                    b.Property<int?>("AssignedAnalystId")
+                    b.Property<int>("AssignedAnalystId")
                         .HasColumnType("integer");
 
                     b.Property<DateTime?>("ClosedAt")
@@ -169,7 +172,8 @@ namespace LogNomaly.Web.Migrations
                     b.HasOne("LogNomaly.Web.Entities.Models.Analyst", "AssignedAnalyst")
                         .WithMany("AssignedCases")
                         .HasForeignKey("AssignedAnalystId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.HasOne("LogNomaly.Web.Entities.Models.AnalystFeedback", "Feedback")
                         .WithMany()
