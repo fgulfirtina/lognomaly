@@ -115,6 +115,10 @@ namespace LogNomaly.Web.Controllers
             if (feedback == null)
                 return NotFound();
 
+            var invCase = await _context.InvestigationCases
+            .Include(c => c.AssignedAnalyst)
+            .FirstOrDefaultAsync(c => c.FeedbackId == id);
+
             // Log is sent to AI and detailed analyze is requested
             var aiAnalysisResult = await _pythonApiService.AnalyzeSingleAsync(feedback.RawLog);
 
@@ -122,7 +126,8 @@ namespace LogNomaly.Web.Controllers
             var viewModel = new CaseReportViewModel
             {
                 FeedbackRecord = feedback,
-                AiInsight = aiAnalysisResult
+                AiInsight = aiAnalysisResult,
+                InvestigationRecord = invCase
             };
 
             return View(viewModel);

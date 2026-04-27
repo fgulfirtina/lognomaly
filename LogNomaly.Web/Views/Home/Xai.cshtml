@@ -178,7 +178,8 @@
 					<option value="SQLInjection">SQLInjection</option>
 					<option value="DDoS">DDoS</option>
 					<option value="SystemFailure">SystemFailure</option>
-					<option value="UnknownAnomaly">TemporalAnomaly</option>
+					<option value="TemporalAnomaly">TemporalAnomaly</option>
+					<option value="UnknownAnomaly">UnknownAnomaly</option>
 				}
 
 				<option disabled>──────────</option>
@@ -223,11 +224,14 @@
 
 		function startInvestigation() {
 			const notes = prompt("Investigation starts. You may add your notes (Optional):");
-			if (notes !== null) {
-				sendActionToBackend("Investigate", notes);
-			}
+			
 			if(confirm("Are you sure to start an official case for this log?")) {
-				sendActionToBackend("Investigate");
+				if (notes !== null) {
+				sendActionToBackend("Investigate", notes);
+				}
+				else{
+					sendActionToBackend("Investigate");
+				}			
 			}
 		}
 

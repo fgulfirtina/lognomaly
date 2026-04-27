@@ -58,8 +58,23 @@
         }
         else if (fb.ActionType == "Investigate")
         {
-            <button class="btn btn-outline" style="color:var(--text-primary); border-color:var(--border);" onclick="addCaseNotes(@fb.Id)">📝 Add Case Notes</button>
-            <button class="btn" style="background:var(--warn); color:white; border:none;" onclick="closeInvestigation(@fb.Id)">🔒 Close Case (Resolved)</button>
+            var inv = Model.InvestigationRecord;
+
+            if (inv != null && inv.AssignedAnalystId == null)
+            {
+                <form method="post" action="/SocManager/ClaimCase" style="display:inline;">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="caseId" value="@inv.Id" />
+                    <button type="submit" class="btn" style="background:var(--danger); color:white; border:none;">
+                        🙋‍♀️ Claim Case
+                    </button>
+                </form>
+            }
+            else
+            {
+                <button class="btn btn-outline" style="color:var(--text-primary); border-color:var(--border);" onclick="addCaseNotes(@fb.Id)">📝 Add Case Notes</button>
+                <button class="btn" style="background:var(--warn); color:white; border:none;" onclick="closeInvestigation(@fb.Id)">🔒 Close Case (Resolved)</button>
+            }
         }
     </div>
 </div>

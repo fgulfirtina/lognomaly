@@ -7,6 +7,7 @@ using LogNomaly.Web.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -140,10 +141,18 @@ namespace LogNomaly.Web.Controllers
         [HttpPost]
         public async Task<IActionResult> AssignRole([FromForm] AssignRoleDto dto)
         {
+            var currentUserId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
+
             var analyst = await _context.Analysts.FindAsync(dto.AnalystId);
             if (analyst == null)
             {
                 TempData["Error"] = "Analyst not found.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            if (analyst.Id == currentUserId)
+            {
+                TempData["Error"] = "You cannot change your own role!";
                 return RedirectToAction(nameof(Index));
             }
 
@@ -182,6 +191,8 @@ namespace LogNomaly.Web.Controllers
         [HttpPost]
         public async Task<IActionResult> DeleteAnalyst([FromForm] int analystId)
         {
+            var currentUserId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
+
             var analyst = await _context.Analysts
             .Include(a => a.Feedbacks)
             .Include(a => a.AssignedCases)
@@ -190,6 +201,18 @@ namespace LogNomaly.Web.Controllers
             if (analyst == null)
             {
                 TempData["Error"] = "Analyst not found.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            if (analyst.Id == currentUserId)
+            {
+                TempData["Error"] = "You cannot delete your own account!";
+                return RedirectToAction(nameof(Index));
+            }
+
+            if (analyst.Role == "Admin")
+            {
+                TempData["Error"] = "Admin accounts cannot be deleted.";
                 return RedirectToAction(nameof(Index));
             }
 

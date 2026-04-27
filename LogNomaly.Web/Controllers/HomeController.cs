@@ -54,6 +54,20 @@ namespace LogNomaly.Web.Controllers
                 return View(vm);
             }
 
+            using (var stream = logFile.OpenReadStream())
+            using (var reader = new StreamReader(stream))
+            {
+                // Read the first line for pattern check
+                string? firstLine = await reader.ReadLineAsync();
+
+                if (string.IsNullOrWhiteSpace(firstLine) ||
+                   (!firstLine.Contains("blk_") && !firstLine.Contains("RAS") && !firstLine.StartsWith("-")))
+                {
+                    vm.ErrorMessage = "Invalid file format. Only BGL and HDFS logs are supported.";
+                    return View(vm);
+                }
+            }
+
             // 1. Upload
             var uploadResp = await _api.UploadFileAsync(logFile);
             if (uploadResp == null)
@@ -94,6 +108,11 @@ namespace LogNomaly.Web.Controllers
             if (string.IsNullOrWhiteSpace(logLine))
             {
                 vm.ErrorMessage = "Log Line cannot be null.";
+                return View(vm);
+            }
+            if (!logLine.Contains("blk_") && !logLine.Contains("RAS") && !logLine.StartsWith("-"))
+            {
+                vm.ErrorMessage = "Invalid file format. Only BGL and HDFS logs are supported.";
                 return View(vm);
             }
 
